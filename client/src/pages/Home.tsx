@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ArrowDown,
+  ArrowLeft,
   ArrowRight,
-  ArrowUpRight,
   BookOpen,
   Check,
   ChevronDown,
@@ -10,13 +9,17 @@ import {
   Clock3,
   Compass,
   HeartHandshake,
+  Home as HomeIcon,
+  Info,
   Leaf,
+  Lightbulb,
   LockKeyhole,
   Moon,
   RotateCcw,
   Route,
   ShieldCheck,
   Sparkles,
+  Sun,
   Timer,
   X,
   Zap,
@@ -26,116 +29,148 @@ type Protocol = "alivio" | "mapa" | "constrangimento" | "proximo";
 type Distance = "dias" | "semanas" | "meses" | "fe";
 type Difficulty = "sobrecarregado" | "direcao" | "vergonha" | "desistencia";
 type Level = "2" | "10" | "calma";
+type Theme = "dark" | "light";
+type View = "home" | "diagnostico" | "encontro" | "apoio" | "rito";
 
-type ProgressState = {
+type AppState = {
   level: Level;
   completedStep: number;
   lastVisitedAt: number;
   protocol: Protocol;
+  journeyStep: number;
+  theme: Theme;
 };
 
-const STORAGE_KEY = "recomecar-hoje-progress-v1";
-const sections = [
-  { id: "diagnostico", label: "Seu ponto de partida" },
-  { id: "roteiro", label: "Roteiro" },
-  { id: "travas", label: "Se travar" },
-  { id: "rito", label: "Rito de retorno" },
+type RouteStep = {
+  time: string;
+  eyebrow: string;
+  title: string;
+  prompt: string;
+  passage: string;
+  focus: string;
+  why: string;
+  action: string;
+};
+
+const STORAGE_KEY = "recomecar-hoje-app-v2";
+
+const navItems: { id: View; label: string; shortLabel: string; icon: ReactNode }[] = [
+  { id: "home", label: "Início", shortLabel: "Hoje", icon: <HomeIcon size={18} /> },
+  { id: "diagnostico", label: "Ponto de partida", shortLabel: "Começar", icon: <Compass size={18} /> },
+  { id: "encontro", label: "Meu encontro", shortLabel: "Encontro", icon: <BookOpen size={18} /> },
+  { id: "apoio", label: "Apoio", shortLabel: "Apoio", icon: <CircleHelp size={18} /> },
+  { id: "rito", label: "Rito de retorno", shortLabel: "Rito", icon: <RotateCcw size={18} /> },
 ];
 
-const protocolDetails: Record<
-  Protocol,
-  { title: string; description: string; icon: React.ReactNode; label: string }
-> = {
+const journeySteps: { number: string; title: string; description: string; view: View; icon: ReactNode }[] = [
+  { number: "01", title: "Ponto de partida", description: "Entenda o que você precisa agora.", view: "diagnostico", icon: <Compass size={18} /> },
+  { number: "02", title: "Ritmo de agora", description: "Escolha o tempo que você realmente tem.", view: "encontro", icon: <Timer size={18} /> },
+  { number: "03", title: "Encontro guiado", description: "Leia, reflita e faça sua oração possível.", view: "encontro", icon: <BookOpen size={18} /> },
+  { number: "04", title: "Próximo passo", description: "Saia sabendo como continuar.", view: "rito", icon: <Route size={18} /> },
+];
+
+const protocolDetails: Record<Protocol, { title: string; description: string; icon: ReactNode; label: string; detail: string }> = {
   alivio: {
     title: "Modo Alívio",
-    description: "Para quando até abrir a Bíblia parece pesado. Um começo mínimo ainda é um começo.",
-    icon: <Sparkles size={20} strokeWidth={1.8} />,
+    description: "Quando até abrir a Bíblia parece pesado.",
+    icon: <Sparkles size={19} />,
     label: "começo mínimo",
+    detail: "Uma oração honesta e pequena para reduzir a distância entre você e o primeiro passo.",
   },
   mapa: {
     title: "Mapa do Retorno",
-    description: "Para quem está distante e não sabe por onde abrir. Você não precisa voltar ao primeiro dia.",
-    icon: <Compass size={20} strokeWidth={1.8} />,
+    description: "Quando você está distante e não sabe por onde abrir.",
+    icon: <Compass size={19} />,
     label: "ponto de partida",
+    detail: "Um caminho claro para voltar ao texto sem tentar reconstruir todos os dias perdidos.",
   },
   constrangimento: {
     title: "Volta sem Constrangimento",
-    description: "Para quem parou e está evitando voltar. Você não precisa justificar a ausência para recomeçar.",
-    icon: <HeartHandshake size={20} strokeWidth={1.8} />,
+    description: "Quando a vergonha faz você adiar a volta.",
+    icon: <HeartHandshake size={19} />,
     label: "retorno leve",
+    detail: "Você chega como está, sem precisar justificar a ausência nem provar constância.",
   },
   proximo: {
     title: "Próximo Encontro",
-    description: "Para quem terminou uma sessão e não sabe o que vem depois. O próximo passo já vem pronto.",
-    icon: <Route size={20} strokeWidth={1.8} />,
+    description: "Quando você terminou e não sabe o que vem depois.",
+    icon: <Route size={19} />,
     label: "continuidade",
+    detail: "O próximo trecho vem pronto para você não depender de uma nova decisão.",
   },
 };
 
-const distanceOptions: { value: Distance; label: string }[] = [
-  { value: "dias", label: "Poucos dias" },
-  { value: "semanas", label: "Algumas semanas" },
-  { value: "meses", label: "Meses ou mais" },
-  { value: "fe", label: "Estou recomeçando na fé" },
+const distanceOptions: { value: Distance; label: string; description: string }[] = [
+  { value: "dias", label: "Poucos dias", description: "A pausa ainda parece recente." },
+  { value: "semanas", label: "Algumas semanas", description: "A volta já começou a ficar distante." },
+  { value: "meses", label: "Meses ou mais", description: "Você quer voltar sem recomeçar do zero." },
+  { value: "fe", label: "Estou recomeçando na fé", description: "Quero um primeiro passo sem complicar." },
 ];
 
-const difficultyOptions: { value: Difficulty; label: string }[] = [
-  { value: "sobrecarregado", label: "Estou sobrecarregado" },
-  { value: "direcao", label: "Não sei por onde começar" },
-  { value: "vergonha", label: "Sinto vergonha de ter parado" },
-  { value: "desistencia", label: "Já tentei e desisti" },
+const difficultyOptions: { value: Difficulty; label: string; description: string }[] = [
+  { value: "sobrecarregado", label: "Estou sobrecarregado", description: "Minha cabeça já está cheia." },
+  { value: "direcao", label: "Não sei por onde começar", description: "Tenho vontade, mas falta direção." },
+  { value: "vergonha", label: "Sinto vergonha de ter parado", description: "Parece que preciso explicar minha ausência." },
+  { value: "desistencia", label: "Já tentei e desisti", description: "Tenho medo de começar mais uma vez." },
 ];
 
-const troubleItems: {
-  title: string;
-  answer: string;
-  protocol: Protocol;
-}[] = [
+const troubleItems: { title: string; answer: string; protocol: Protocol; action: string }[] = [
   {
     title: "Fiquei semanas sem abrir a Bíblia e agora não sei por onde começar",
-    answer: "Comece pelo Mapa do Retorno. Você não precisa voltar ao primeiro dia nem reconstruir toda a rotina. Escolha o encontro possível para o seu momento atual.",
+    answer: "Você não precisa voltar ao primeiro dia. Abra uma passagem curta, observe o que toca seu momento atual e pare antes de transformar a volta em um plano impossível.",
     protocol: "mapa",
+    action: "Abrir Mapa do Retorno",
   },
   {
     title: "Comecei um plano, parei e agora sinto que estraguei tudo",
-    answer: "Você não estragou tudo. Um plano interrompido não vira dívida. Abra um novo encontro e siga a partir de hoje.",
+    answer: "Um plano interrompido não vira dívida. O que ficou para trás pode ficar para trás. O encontro de hoje começa pelo texto que cabe no seu momento, não pela página que você perdeu.",
     protocol: "mapa",
+    action: "Começar sem recuperar",
   },
   {
     title: "Tenho vontade de voltar, mas estou me sentindo constrangido",
-    answer: "Use a Volta sem Constrangimento. Você não precisa explicar sua ausência, provar constância ou fingir que está tudo bem para começar.",
+    answer: "A volta não exige explicação. Você não precisa provar que mudou, prometer que nunca mais vai parar ou fingir que está bem. Apenas chegue com verdade.",
     protocol: "constrangimento",
+    action: "Voltar sem constrangimento",
   },
   {
     title: "Não consigo fazer uma oração longa",
-    answer: "Use o Modo Alívio. Uma frase honesta já pode ser a oração possível de hoje.",
+    answer: "Oração possível não é oração menor. Diga uma frase verdadeira: o que você carrega, o que precisa ou simplesmente que está aqui.",
     protocol: "alivio",
+    action: "Usar Modo Alívio",
   },
   {
     title: "Tenho só alguns minutos e não quero iniciar algo que não vou terminar",
-    answer: "Escolha Tenho 2 minutos. O primeiro passo foi feito para caber num dia corrido, sem abrir uma obrigação que você não consegue sustentar.",
+    answer: "Você pode fazer apenas o começo. Dois minutos já diminuem a distância e não criam uma obrigação de continuar quando o seu dia não comporta isso.",
     protocol: "alivio",
+    action: "Começar em 2 minutos",
   },
   {
     title: "Terminei o encontro, mas não sei qual é o próximo passo",
-    answer: "Abra o Próximo Encontro. Você recebe uma nova passagem, uma pergunta de reflexão e uma oração possível, sem precisar procurar outro plano.",
+    answer: "Você não precisa procurar um novo plano. O próximo encontro oferece uma passagem, uma pergunta e uma oração possível para seguir sem abrir outra frente.",
     protocol: "proximo",
+    action: "Abrir Próximo Encontro",
   },
 ];
 
-function readSavedProgress(): ProgressState {
-  const fallback: ProgressState = { level: "10", completedStep: 0, lastVisitedAt: Date.now(), protocol: "mapa" };
+function defaultState(): AppState {
+  return { level: "10", completedStep: 0, lastVisitedAt: Date.now(), protocol: "mapa", journeyStep: 0, theme: "dark" };
+}
+
+function readState(): AppState {
+  const fallback = defaultState();
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as Partial<ProgressState>;
-    if (!parsed.level || typeof parsed.completedStep !== "number") return fallback;
+    const parsed = JSON.parse(raw) as Partial<AppState>;
     return {
-      level: parsed.level,
-      completedStep: Math.max(0, parsed.completedStep),
-      lastVisitedAt: typeof parsed.lastVisitedAt === "number" ? parsed.lastVisitedAt : Date.now(),
-      protocol: parsed.protocol ?? "mapa",
+      level: parsed.level === "2" || parsed.level === "10" || parsed.level === "calma" ? parsed.level : fallback.level,
+      completedStep: typeof parsed.completedStep === "number" ? Math.max(0, parsed.completedStep) : 0,
+      lastVisitedAt: typeof parsed.lastVisitedAt === "number" ? parsed.lastVisitedAt : fallback.lastVisitedAt,
+      protocol: parsed.protocol === "alivio" || parsed.protocol === "mapa" || parsed.protocol === "constrangimento" || parsed.protocol === "proximo" ? parsed.protocol : fallback.protocol,
+      journeyStep: typeof parsed.journeyStep === "number" ? Math.max(0, Math.min(3, parsed.journeyStep)) : 0,
+      theme: parsed.theme === "light" ? "light" : "dark",
     };
   } catch {
     return fallback;
@@ -146,23 +181,22 @@ function getRecommendedProtocol(distance?: Distance, difficulty?: Difficulty): P
   if (!distance || !difficulty) return null;
   if (difficulty === "sobrecarregado") return "alivio";
   if (difficulty === "vergonha" || difficulty === "desistencia") return "constrangimento";
-  if (distance === "dias" && difficulty === "direcao") return "proximo";
-  if (difficulty === "direcao") return "mapa";
-  return distance === "dias" ? "proximo" : "mapa";
+  if (difficulty === "direcao") return distance === "dias" ? "proximo" : "mapa";
+  return distance === "dias" || distance === "fe" ? "proximo" : "mapa";
 }
 
-function getSteps(level: Level, protocol: Protocol) {
+function getSteps(level: Level, protocol: Protocol): RouteStep[] {
   if (level === "2") {
-    return [
-      {
-        time: "2 min",
-        eyebrow: "Modo Alívio",
-        title: "Faça uma oração de chegada",
-        prompt: "Diga uma frase verdadeira sobre como você chegou hoje.",
-        passage: "Você pode começar assim: “Deus, eu estou aqui, mesmo sem saber por onde começar.”",
-        action: "Fazer minha oração",
-      },
-    ];
+    return [{
+      time: "2 min",
+      eyebrow: "Modo Alívio",
+      title: "Faça uma oração de chegada",
+      prompt: "Diga uma frase verdadeira sobre como você chegou hoje.",
+      passage: "Você pode começar assim: “Deus, eu estou aqui, mesmo sem saber por onde começar.”",
+      focus: "Não procure a frase perfeita. Apenas nomeie a sua presença.",
+      why: "Um começo pequeno reduz a pressão e torna a volta possível sem criar outra cobrança.",
+      action: "Fazer minha oração",
+    }];
   }
   if (level === "calma") {
     return [
@@ -170,8 +204,10 @@ function getSteps(level: Level, protocol: Protocol) {
         time: "5 min",
         eyebrow: "Passagem",
         title: "Leia Salmo 23:1-3",
-        prompt: "Leia devagar. Não tente recuperar o que ficou para trás.",
+        prompt: "Leia devagar, sem tentar recuperar o que ficou para trás.",
         passage: "Observe a imagem de cuidado, direção e descanso que aparece no texto.",
+        focus: "Escolha uma palavra ou imagem para levar com você.",
+        why: "A leitura volta a ser um encontro, não uma prova de desempenho.",
         action: "Concluir passagem",
       },
       {
@@ -180,6 +216,8 @@ function getSteps(level: Level, protocol: Protocol) {
         title: "Nomeie o que pesa",
         prompt: "O que em você está pedindo descanso, direção ou coragem para voltar?",
         passage: "Escreva uma frase. Não é uma redação e não precisa soar bonita.",
+        focus: "Fique com a pergunta por alguns minutos antes de procurar uma resposta.",
+        why: "Dar nome ao peso diminui a sensação de que você precisa resolver tudo de uma vez.",
         action: "Concluir reflexão",
       },
       {
@@ -188,303 +226,276 @@ function getSteps(level: Level, protocol: Protocol) {
         title: "Ore sem preparar discurso",
         prompt: "Fale com Deus sobre a frase que você escreveu.",
         passage: "Quando terminar, abra o Próximo Encontro ou continue outro dia. A volta não precisa virar cobrança.",
+        focus: "Termine com uma frase que você consegue sustentar hoje.",
+        why: "O encontro acaba com direção, não com a sensação de que outra tarefa ficou pendente.",
         action: "Concluir encontro",
       },
     ];
   }
+  const firstTitle = protocol === "mapa" ? "Abra pelo seu momento" : protocol === "constrangimento" ? "Volte sem explicar sua ausência" : protocol === "proximo" ? "Continue pelo próximo trecho" : "Leia Salmo 23:1-3";
+  const firstPrompt = protocol === "mapa" ? "Leia Salmo 23:1-3 sem procurar o primeiro dia perdido." : protocol === "constrangimento" ? "Leia lembrando que você não precisa provar nada para voltar." : protocol === "proximo" ? "Leia como o próximo passo, não como uma dívida antiga." : "Leia a passagem indicada sem tentar recuperar dias perdidos.";
+  const firstPassage = protocol === "mapa" ? "Observe uma palavra ou imagem que encontre o seu momento de hoje." : protocol === "constrangimento" ? "Você pode chegar como está. Não precisa transformar a ausência em explicação." : protocol === "proximo" ? "Observe uma palavra que possa acompanhar o seu próximo encontro." : "Observe uma palavra ou imagem que encontre o seu momento de hoje.";
   return [
-    {
-      time: "3 min",
-      eyebrow: protocol === "mapa" ? "Mapa do Retorno" : protocol === "constrangimento" ? "Volta sem Constrangimento" : protocol === "proximo" ? "Próximo Encontro" : "Passagem",
-      title: protocol === "mapa" ? "Abra pelo seu momento" : protocol === "constrangimento" ? "Volte sem explicar sua ausência" : protocol === "proximo" ? "Continue pelo próximo trecho" : "Leia Salmo 23:1-3",
-      prompt: protocol === "mapa" ? "Leia Salmo 23:1-3 sem procurar o primeiro dia perdido." : protocol === "constrangimento" ? "Leia Salmo 23:1-3 lembrando que você não precisa provar nada para voltar." : protocol === "proximo" ? "Leia Salmo 23:1-3 como o próximo passo, não como uma dívida antiga." : "Leia a passagem indicada sem tentar recuperar dias perdidos.",
-      passage: protocol === "mapa" ? "Observe uma palavra ou imagem que encontre o seu momento de hoje." : protocol === "constrangimento" ? "Você pode chegar como está. Não precisa transformar a ausência em explicação." : protocol === "proximo" ? "Observe uma palavra que possa acompanhar o seu próximo encontro." : "Observe uma palavra ou imagem que encontre o seu momento de hoje.",
-      action: "Concluir passagem",
-    },
-    {
-      time: "5 min",
-      eyebrow: "Reflexão",
-      title: "Nomeie o que pesa",
-      prompt: "O que em você precisa de descanso, direção ou coragem hoje?",
-      passage: "Responda em uma frase. O objetivo é estar presente, não produzir uma reflexão perfeita.",
-      action: "Concluir reflexão",
-    },
-    {
-      time: "2 min",
-      eyebrow: "Oração possível",
-      title: "Fale com Deus em uma frase",
-      prompt: "Você pode usar suas próprias palavras ou começar com “Deus, me ajude a voltar sem medo.”",
-      passage: "Quando terminar, você voltou. Isso importa mais do que os dias em que ficou longe.",
-      action: "Concluir encontro",
-    },
+    { time: "3 min", eyebrow: protocolDetails[protocol].title, title: firstTitle, prompt: firstPrompt, passage: firstPassage, focus: "Leia para encontrar um ponto de contato, não para terminar uma obrigação.", why: "A primeira passagem devolve um lugar claro para começar.", action: "Concluir passagem" },
+    { time: "5 min", eyebrow: "Reflexão", title: "Nomeie o que pesa", prompt: "O que em você precisa de descanso, direção ou coragem hoje?", passage: "Responda em uma frase. O objetivo é estar presente, não produzir uma reflexão perfeita.", focus: "Se ajudar, complete: “Hoje eu preciso de...”", why: "A reflexão transforma uma sensação difusa em algo que pode ser levado para a oração.", action: "Concluir reflexão" },
+    { time: "2 min", eyebrow: "Oração possível", title: "Fale com Deus em uma frase", prompt: "Use suas próprias palavras ou comece com: “Deus, me ajude a voltar sem medo.”", passage: "Quando terminar, você voltou. Isso importa mais do que os dias em que ficou longe.", focus: "Não prometa constância. Apenas entregue o que é verdadeiro agora.", why: "O encontro termina com uma volta possível, não com uma meta difícil de manter.", action: "Concluir encontro" },
   ];
 }
 
 export default function Home() {
-  const [progress, setProgress] = useState<ProgressState>(() => readSavedProgress());
-  const [activeProtocol, setActiveProtocol] = useState<Protocol>(() => readSavedProgress().protocol);
+  const [state, setState] = useState<AppState>(() => readState());
+  const [view, setView] = useState<View>("home");
   const [distance, setDistance] = useState<Distance>();
   const [difficulty, setDifficulty] = useState<Difficulty>();
-  const [activeSection, setActiveSection] = useState("diagnostico");
   const [openTrouble, setOpenTrouble] = useState<number | null>(null);
-  const [showRitual, setShowRitual] = useState(false);
   const [ritualChoice, setRitualChoice] = useState<"recover" | "return" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const steps = useMemo(() => getSteps(progress.level, activeProtocol), [progress.level, activeProtocol]);
+  const steps = useMemo(() => getSteps(state.level, state.protocol), [state.level, state.protocol]);
+  const completed = state.completedStep >= steps.length;
+  const currentIndex = Math.min(state.completedStep, Math.max(steps.length - 1, 0));
+  const completionPercent = Math.min(100, Math.round((state.completedStep / steps.length) * 100));
   const recommended = getRecommendedProtocol(distance, difficulty);
-  const completed = progress.completedStep >= steps.length;
-  const currentIndex = Math.min(progress.completedStep, Math.max(steps.length - 1, 0));
-  const completionPercent = Math.min(100, Math.round((progress.completedStep / steps.length) * 100));
-  const isReturningAfterGap = progress.completedStep > 0 && !completed && Date.now() - progress.lastVisitedAt > 36 * 60 * 60 * 1000;
+  const isReturningAfterGap = state.completedStep > 0 && !completed && Date.now() - state.lastVisitedAt > 36 * 60 * 60 * 1000;
+  const nextAction = state.journeyStep === 0
+    ? { eyebrow: "Passo 01", title: "Escolha seu ponto de partida", copy: "Duas respostas rápidas para tirar a escolha das suas costas.", button: "Começar agora", view: "diagnostico" as View }
+    : state.journeyStep === 1
+      ? { eyebrow: "Passo 02", title: "Escolha o ritmo de agora", copy: "Não escolha o que gostaria de conseguir. Escolha o tempo que realmente tem.", button: "Escolher meu ritmo", view: "encontro" as View }
+      : state.journeyStep === 2
+        ? { eyebrow: "Passo 03", title: completed ? "Seu encontro está concluído" : "Continue o encontro daqui", copy: completed ? "Você já voltou. Agora escolha como seguir." : `${steps[currentIndex]?.title ?? "Próximo passo"}. O conteúdo está pronto para você.`, button: completed ? "Ver próximo passo" : "Continuar encontro", view: completed ? "rito" as View : "encontro" as View }
+        : { eyebrow: "Passo 04", title: "Você não precisa voltar sozinho", copy: "O próximo encontro já está organizado para quando você quiser continuar.", button: "Abrir próximo passo", view: "rito" as View };
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      // Local storage may be unavailable in a restricted browser context.
+      // O progresso continua funcionando mesmo se o navegador bloquear storage.
     }
-  }, [progress]);
+  }, [state]);
 
   useEffect(() => {
-    if (isReturningAfterGap) setShowRitual(true);
-  }, [isReturningAfterGap]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        const visible = entries
-          .filter(entry => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible) setActiveSection(visible.target.id);
-      },
-      { rootMargin: "-22% 0px -62% 0px", threshold: [0.1, 0.3, 0.6] },
-    );
-    sections.forEach(section => {
-      const element = document.getElementById(section.id);
-      if (element) observer.observe(element);
-    });
-    return () => observer.disconnect();
-  }, []);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [view]);
 
   useEffect(() => {
     if (!notice) return;
-    const timeout = window.setTimeout(() => setNotice(null), 4200);
-    return () => window.clearTimeout(timeout);
+    const timer = window.setTimeout(() => setNotice(null), 3800);
+    return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const go = (nextView: View) => setView(nextView);
+
+  const continueFromDiagnostic = () => {
+    if (!recommended) return;
+    setState(current => ({ ...current, protocol: recommended, journeyStep: Math.max(current.journeyStep, 1), lastVisitedAt: Date.now() }));
+    setNotice(`${protocolDetails[recommended].title} escolhido como ponto de partida.`);
+    go("encontro");
   };
 
-  const chooseLevel = (level: Level, protocolOverride?: Protocol) => {
-    const nextProtocol = protocolOverride ?? (level === "2" ? "alivio" : activeProtocol === "alivio" ? "mapa" : activeProtocol);
-    setActiveProtocol(nextProtocol);
-    setProgress(current => ({ ...current, level, protocol: nextProtocol, completedStep: 0, lastVisitedAt: Date.now() }));
-    setNotice(level === "2" ? "Você escolheu um começo de 2 minutos." : level === "10" ? "Você escolheu o encontro de 10 minutos." : "Você escolheu continuar com mais calma.");
+  const chooseLevel = (level: Level) => {
+    const protocol = level === "2" ? "alivio" : state.protocol === "alivio" ? "mapa" : state.protocol;
+    setState(current => ({ ...current, level, protocol, completedStep: 0, journeyStep: 2, lastVisitedAt: Date.now() }));
+    setNotice(level === "2" ? "Seu encontro de 2 minutos está pronto." : level === "10" ? "Seu encontro de 10 minutos está pronto." : "Seu ritmo calmo está pronto.");
   };
 
   const completeCurrentStep = () => {
-    setProgress(current => ({
-      ...current,
-      completedStep: Math.min(current.completedStep + 1, steps.length),
-      lastVisitedAt: Date.now(),
-    }));
+    const nextCount = Math.min(state.completedStep + 1, steps.length);
+    setState(current => ({ ...current, completedStep: nextCount, journeyStep: nextCount >= steps.length ? 3 : 2, lastVisitedAt: Date.now() }));
+    setNotice(nextCount >= steps.length ? "Encontro concluído. Você voltou hoje." : "Etapa concluída. O próximo passo já está aberto.");
   };
 
   const startNextEncounter = () => {
-    setProgress(current => ({ ...current, completedStep: 0, lastVisitedAt: Date.now() }));
+    setState(current => ({ ...current, completedStep: 0, journeyStep: 2, lastVisitedAt: Date.now() }));
+    setRitualChoice("return");
     setNotice("Novo encontro pronto. Você não precisa recuperar nenhum dia.");
-    setShowRitual(false);
-    scrollTo("roteiro");
+    go("encontro");
   };
 
-  const selectProtocol = (protocol: Protocol) => {
-    const nextLevel: Level = protocol === "alivio" ? "2" : progress.level === "2" ? "10" : progress.level;
-    chooseLevel(nextLevel, protocol);
+  const chooseProtocol = (protocol: Protocol) => {
+    const level = protocol === "alivio" ? "2" : state.level === "2" ? "10" : state.level;
+    setState(current => ({ ...current, protocol, level, journeyStep: Math.max(current.journeyStep, 1), completedStep: 0, lastVisitedAt: Date.now() }));
     setNotice(`${protocolDetails[protocol].title} selecionado.`);
-    window.setTimeout(() => scrollTo("roteiro"), 80);
+    go("encontro");
   };
 
-  const openTroubleshooterProtocol = (protocol: Protocol) => {
-    setOpenTrouble(null);
-    selectProtocol(protocol);
+  const toggleTheme = (nextTheme: Theme) => {
+    setState(current => ({ ...current, theme: nextTheme }));
+    setNotice(nextTheme === "dark" ? "Tema escuro ativado." : "Tema claro ativado.");
   };
 
-  return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <button className="brand" type="button" onClick={() => scrollTo("topo")} aria-label="Voltar ao início">
-            <span className="brand-mark"><Leaf size={17} strokeWidth={2.2} /></span>
-            <span>Recomeçar Hoje</span>
-          </button>
-          <nav className="section-nav" aria-label="Navegação principal">
-            {sections.map(section => (
-              <button
-                key={section.id}
-                type="button"
-                className={activeSection === section.id ? "active" : ""}
-                onClick={() => scrollTo(section.id)}
-              >
-                {section.label}
-              </button>
-            ))}
-          </nav>
-          <button className="nav-status" type="button" onClick={() => scrollTo("roteiro")}>
-            <span className="status-dot" />
-            {progress.completedStep > 0 && !completed ? "Continuar" : "Sem cobrança"}
+  const renderHeader = () => (
+    <header className="app-header">
+      <div className="header-inner">
+        <button className="brand" type="button" onClick={() => go("home")} aria-label="Voltar ao início">
+          <span className="brand-mark"><Leaf size={17} strokeWidth={2.4} /></span>
+          <span className="brand-name">Recomeçar Hoje</span>
+        </button>
+        <div className="header-context">
+          <span className="live-dot" />
+          {completed ? "Encontro concluído" : state.journeyStep === 0 ? "Um passo de cada vez" : `Passo ${String(Math.min(state.journeyStep + 1, 4)).padStart(2, "0")} de 04`}
+        </div>
+        <div className="header-actions">
+          <span className="desktop-only privacy-chip"><ShieldCheck size={14} /> Sem streak</span>
+          <button className="icon-button" type="button" onClick={() => toggleTheme(state.theme === "dark" ? "light" : "dark")} aria-label={state.theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}>
+            {state.theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
           </button>
         </div>
-      </header>
+      </div>
+    </header>
+  );
 
-      <main>
-        <section className="hero section-wrap" id="topo">
-          <div className="hero-copy">
-            <div className="eyebrow"><span className="eyebrow-line" /> Um encontro possível para hoje</div>
-            <h1>Você não precisa recuperar os dias perdidos.</h1>
-            <p className="hero-lead">Precisa de um próximo encontro. Curto, guiado e sem precisar fingir que está tudo bem.</p>
-            <div className="hero-actions">
-              <button className="button button-primary" type="button" onClick={() => scrollTo("diagnostico")}>
-                Começar meu retorno <ArrowRight size={17} />
+  const renderSidebar = () => (
+    <aside className="side-nav">
+      <div className="side-label">Seu caminho</div>
+      <nav aria-label="Navegação principal">
+        {navItems.map(item => (
+          <button key={item.id} type="button" className={`side-link ${view === item.id ? "active" : ""}`} onClick={() => go(item.id)}>
+            <span className="side-link-icon">{item.icon}</span>
+            <span>{item.label}</span>
+            {item.id === "encontro" && state.completedStep > 0 && !completed ? <span className="side-link-dot" /> : null}
+          </button>
+        ))}
+      </nav>
+      <div className="side-progress">
+        <div className="side-progress-head"><span>Seu progresso</span><strong>{state.journeyStep}/4</strong></div>
+        <div className="mini-progress"><span style={{ width: `${(state.journeyStep / 4) * 100}%` }} /></div>
+        <p>Sem cobrança. O ponto é saber voltar.</p>
+      </div>
+      <div className="side-footer"><LockKeyhole size={13} /> Salvo neste navegador</div>
+    </aside>
+  );
+
+  const renderBottomNav = () => (
+    <nav className="bottom-nav" aria-label="Navegação inferior">
+      {navItems.map(item => (
+        <button key={item.id} type="button" className={`bottom-link ${view === item.id ? "active" : ""}`} onClick={() => go(item.id)}>
+          <span className="bottom-icon">{item.icon}</span>
+          <span>{item.shortLabel}</span>
+        </button>
+      ))}
+    </nav>
+  );
+
+  const renderHome = () => (
+    <div className="view-stack">
+      <section className="page-intro home-intro">
+        <div>
+          <div className="eyebrow"><span className="eyebrow-pulse" /> Um encontro possível para hoje</div>
+          <h1>Volte sem pagar os dias perdidos.</h1>
+          <p className="lead">O Recomeçar Hoje organiza o próximo passo para você retomar a prática devocional sem culpa, sem performance e sem precisar fingir que está tudo bem.</p>
+        </div>
+        <div className="intro-meta"><span className="meta-icon"><Clock3 size={16} /></span><span><strong>10 min</strong><small>é o encontro completo</small></span></div>
+      </section>
+
+      {isReturningAfterGap ? (
+        <section className="gap-banner">
+          <div className="gap-icon"><RotateCcw size={19} /></div>
+          <div><span className="eyebrow">Você voltou</span><h2>Não tente recuperar tudo agora.</h2><p>Abra o Rito de Recomeço para escolher com clareza entre pagar os dias perdidos e voltar ao próximo encontro.</p></div>
+          <button className="button button-green" type="button" onClick={() => go("rito")}>Abrir rito <ArrowRight size={16} /></button>
+        </section>
+      ) : null}
+
+      <section className="home-grid">
+        <article className="next-action-card surface-card">
+          <div className="card-topline"><span className="eyebrow">{nextAction.eyebrow}</span><span className="step-badge">{String(Math.min(state.journeyStep + 1, 4)).padStart(2, "0")}/04</span></div>
+          <div className="next-action-icon"><Zap size={21} fill="currentColor" /></div>
+          <h2>{nextAction.title}</h2>
+          <p>{nextAction.copy}</p>
+          <button className="button button-green" type="button" onClick={() => go(nextAction.view)}>{nextAction.button} <ArrowRight size={16} /></button>
+          <div className="card-footnote"><ShieldCheck size={14} /> Seu progresso fica salvo sem contagem de dias.</div>
+        </article>
+        <article className="principles-card surface-card">
+          <div className="card-topline"><span className="eyebrow">A regra de hoje</span><span className="quiet-label">01</span></div>
+          <h3>Constância não é nunca falhar. É saber voltar.</h3>
+          <p>A culpa tenta transformar a volta em uma prova. Aqui, a volta é um encontro curto com um próximo passo claro.</p>
+          <div className="principle-list">
+            <div><span className="principle-number">01</span><span><strong>Sem recuperar</strong><small>O passado não é uma tarefa.</small></span></div>
+            <div><span className="principle-number">02</span><span><strong>Sem fingir</strong><small>Você começa como está.</small></span></div>
+            <div><span className="principle-number">03</span><span><strong>Com direção</strong><small>O próximo passo vem pronto.</small></span></div>
+          </div>
+        </article>
+      </section>
+
+      <section className="section-block">
+        <div className="section-title-row"><div><span className="eyebrow">Sua sequência</span><h2>Um caminho, não um labirinto.</h2></div><span className="section-caption">{state.journeyStep === 3 ? "caminho concluído" : `${4 - state.journeyStep} passos restantes`}</span></div>
+        <div className="journey-list">
+          {journeySteps.map((step, index) => {
+            const done = index < state.journeyStep;
+            const active = index === state.journeyStep;
+            const locked = index > state.journeyStep;
+            const targetView = index === 2 ? "encontro" : step.view;
+            return (
+              <button key={step.number} className={`journey-row ${done ? "done" : ""} ${active ? "active" : ""} ${locked ? "locked" : ""}`} type="button" onClick={() => !locked && go(targetView)}>
+                <span className="journey-number">{done ? <Check size={15} /> : step.number}</span>
+                <span className="journey-icon">{step.icon}</span>
+                <span className="journey-copy"><strong>{step.title}</strong><small>{step.description}</small></span>
+                <span className="journey-state">{done ? "feito" : active ? "agora" : <LockKeyhole size={14} />}</span>
               </button>
-              <button className="text-button" type="button" onClick={() => scrollTo("roteiro")}>
-                Ver o roteiro <ArrowDown size={16} />
-              </button>
-            </div>
-            <div className="hero-note"><ShieldCheck size={16} /> Sem streak. Sem punição. Seu progresso fica salvo neste navegador.</div>
-          </div>
-          <div className="hero-visual" aria-hidden="true">
-            <div className="sun-disc"><span>HOJE</span><small>é um bom dia<br />para voltar</small></div>
-            <div className="orbit orbit-one" /><div className="orbit orbit-two" />
-            <div className="visual-tag visual-tag-top"><Clock3 size={15} /> 10 min</div>
-            <div className="visual-tag visual-tag-bottom"><RotateCcw size={15} /> sem recuperar</div>
-          </div>
-        </section>
+            );
+          })}
+        </div>
+      </section>
 
-        <section className="intro-band">
-          <div className="section-wrap intro-grid">
-            <div><span className="section-kicker">A regra de hoje</span><h2>Constância não é nunca falhar. É saber voltar.</h2></div>
-            <p>O Recomeçar Hoje organiza o primeiro passo para você não transformar a volta em outra dívida.</p>
-          </div>
-        </section>
+      <section className="insight-card">
+        <div className="insight-symbol"><Lightbulb size={22} /></div>
+        <div><span className="eyebrow">Para levar com você</span><h3>A fantasia do momento perfeito também atrasa a volta.</h3><p>Você não precisa sentir vontade, ter a rotina certa ou saber exatamente o que dizer. O encontro começa quando você escolhe um passo possível mesmo sem certeza.</p></div>
+      </section>
 
-        <section className="section-wrap section" id="diagnostico">
-          <div className="section-heading">
-            <div><span className="section-kicker">01 · Seu ponto de partida</span><h2>Como você chegou até aqui?</h2></div>
-            <p>Responda sem pensar demais. O objetivo não é medir você. É tirar a escolha das suas costas.</p>
-          </div>
-          <div className="diagnostic-layout">
-            <div className="diagnostic-card card-surface">
-              <div className="question-block">
-                <span className="question-label">Há quanto tempo você está distante?</span>
-                <div className="choice-grid choice-grid-four">
-                  {distanceOptions.map(option => (
-                    <button key={option.value} type="button" className={`choice ${distance === option.value ? "selected" : ""}`} onClick={() => setDistance(option.value)}>
-                      <span className="choice-check">{distance === option.value ? <Check size={14} /> : null}</span>
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="question-block">
-                <span className="question-label">O que mais dificulta seu retorno agora?</span>
-                <div className="choice-grid choice-grid-two">
-                  {difficultyOptions.map(option => (
-                    <button key={option.value} type="button" className={`choice ${difficulty === option.value ? "selected" : ""}`} onClick={() => setDifficulty(option.value)}>
-                      <span className="choice-check">{difficulty === option.value ? <Check size={14} /> : null}</span>
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {recommended ? (
-                <div className="recommendation" role="status">
-                  <div className="recommendation-icon">{protocolDetails[recommended].icon}</div>
-                  <div><span className="mini-label">Seu ponto de partida pode ser</span><strong>{protocolDetails[recommended].title}</strong><p>{protocolDetails[recommended].description}</p></div>
-                  <button className="icon-button" type="button" onClick={() => selectProtocol(recommended)} aria-label="Ir para o protocolo recomendado"><ArrowUpRight size={19} /></button>
-                </div>
-              ) : (
-                <div className="diagnostic-hint"><CircleHelp size={17} /> Escolha uma opção em cada pergunta para receber um ponto de partida.</div>
-              )}
-            </div>
-            <aside className="side-note">
-              <span className="note-number">01</span>
-              <h3>Não existe uma resposta certa aqui.</h3>
-              <p>O melhor retorno é o que cabe no momento em que você está, não o que parece mais disciplinado.</p>
-            </aside>
-          </div>
-          <div className="protocol-list">
-            <div className="list-heading"><span className="section-kicker">Quatro portas de entrada</span><span className="list-caption">Escolha ou deixe o diagnóstico indicar.</span></div>
-            <div className="protocol-grid">
-              {(Object.keys(protocolDetails) as Protocol[]).map(protocol => {
-                const detail = protocolDetails[protocol];
-                return <button key={protocol} type="button" className="protocol-card" onClick={() => selectProtocol(protocol)}><span className="protocol-icon">{detail.icon}</span><span className="protocol-copy"><strong>{detail.title}</strong><span>{detail.description}</span></span><span className="protocol-label">{detail.label}</span><ArrowUpRight className="protocol-arrow" size={18} /></button>;
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className="section-wrap section" id="roteiro">
-          <div className="section-heading section-heading-tight">
-            <div><span className="section-kicker">02 · Seu próximo encontro</span><h2>Escolha o nível de agora.</h2></div>
-            <p>Não escolha o que você gostaria de conseguir. Escolha o tempo que realmente tem.</p>
-          </div>
-          <div className="level-grid">
-            <button type="button" className={`level-card ${progress.level === "2" ? "selected" : ""}`} onClick={() => chooseLevel("2")}><span className="level-icon"><Zap size={20} /></span><span className="level-time">2 min</span><strong>Tenho 2 minutos</strong><span>Uma oração de chegada. O menor passo possível.</span></button>
-            <button type="button" className={`level-card ${progress.level === "10" ? "selected" : ""}`} onClick={() => chooseLevel("10")}><span className="level-icon"><Timer size={20} /></span><span className="level-time">10 min</span><strong>Tenho 10 minutos</strong><span>Passagem, reflexão e oração em um encontro guiado.</span></button>
-            <button type="button" className={`level-card ${progress.level === "calma" ? "selected" : ""}`} onClick={() => chooseLevel("calma")}><span className="level-icon"><Moon size={20} /></span><span className="level-time">ritmo calmo</span><strong>Quero continuar com mais calma</strong><span>Reflexão ampliada e acesso ao Próximo Encontro.</span></button>
-          </div>
-
-          <div className="route-shell card-surface">
-            <div className="route-header">
-              <div><span className="mini-label">{progress.level === "2" ? "Modo Alívio" : progress.level === "calma" ? `${protocolDetails[activeProtocol].title} · ritmo calmo` : protocolDetails[activeProtocol].title}</span><h3>{completed ? "Você voltou." : "Um encontro sem dívida."}</h3></div>
-              <div className="progress-summary"><span>{progress.completedStep} de {steps.length} partes</span><strong>{completionPercent}%</strong></div>
-            </div>
-            <div className="progress-track" aria-label={`${completionPercent}% concluído`}><span style={{ width: `${completionPercent}%` }} /></div>
-            <div className="step-index-row">
-              {steps.map((step, index) => <span key={step.title} className={`step-index ${index < progress.completedStep ? "done" : index === currentIndex && !completed ? "current" : ""}`}><span>{index < progress.completedStep ? <Check size={13} /> : index + 1}</span>{step.eyebrow}</span>)}
-            </div>
-            {!completed ? (
-              <div className="active-step">
-                <div className="active-step-marker"><BookOpen size={22} /></div>
-                <div className="active-step-content"><span className="section-kicker">{steps[currentIndex].time} · {steps[currentIndex].eyebrow}</span><h3>{steps[currentIndex].title}</h3><p className="step-prompt">{steps[currentIndex].prompt}</p><div className="passage-box"><span className="mini-label">Para este momento</span><p>{steps[currentIndex].passage}</p></div><button className="button button-primary" type="button" onClick={completeCurrentStep}>{steps[currentIndex].action} <Check size={17} /></button></div>
-              </div>
-            ) : (
-              <div className="completion-state" role="status"><div className="completion-icon"><Check size={28} /></div><div><span className="section-kicker">Encontro concluído</span><h3>Você voltou. Isso importa.</h3><p>Mais do que os dias em que você ficou longe, importa o próximo encontro que você escolheu fazer.</p><div className="identity-statement"><span className="mini-label">Declaração de identidade</span><strong>Você é alguém que consegue voltar.</strong></div><div className="completion-actions"><button className="button button-primary" type="button" onClick={startNextEncounter}>Abrir o Próximo Encontro <ArrowRight size={17} /></button><button className="text-button" type="button" onClick={() => setNotice("Tudo bem continuar outro dia. Seu progresso ficou salvo neste navegador.")}>Continuar outro dia</button></div></div></div>
-            )}
-            <div className="return-note"><LockKeyhole size={15} /><span>Seu progresso fica salvo neste navegador. Se você parar, pode continuar daqui ou começar um novo encontro.</span></div>
-          </div>
-        </section>
-
-        <section className="section-wrap section" id="travas">
-          <div className="section-heading"><div><span className="section-kicker">03 · Se travar</span><h2>O que está travando seu retorno?</h2></div><p>Abra só a situação que parece com a sua. A resposta é curta de propósito.</p></div>
-          <div className="accordion-list">
-            {troubleItems.map((item, index) => {
-              const isOpen = openTrouble === index;
-              return <div className={`accordion-item ${isOpen ? "open" : ""}`} key={item.title}><button type="button" className="accordion-trigger" onClick={() => setOpenTrouble(isOpen ? null : index)} aria-expanded={isOpen}><span>{item.title}</span><ChevronDown size={19} /></button>{isOpen && <div className="accordion-content"><p>{item.answer}</p><button type="button" className="inline-link" onClick={() => openTroubleshooterProtocol(item.protocol)}>Ir para {protocolDetails[item.protocol].title} <ArrowRight size={15} /></button></div>}</div>;
-            })}
-          </div>
-        </section>
-
-        <section className="section-wrap section" id="rito">
-          <div className="ritual-panel">
-            <div className="ritual-copy"><span className="section-kicker">04 · Rito de Recomeço</span><h2>Você vai tentar pagar os dias perdidos ou voltar para o próximo encontro?</h2><p>Quando a culpa aparecer, não deixe que ela escolha por você. Veja as duas rotas com clareza.</p><button type="button" className="button button-primary" onClick={() => { setRitualChoice(null); setShowRitual(true); }}>Abrir o rito <RotateCcw size={17} /></button></div>
-            <div className="ritual-visual"><div className="ritual-orbit"><span className="ritual-center">HOJE<small>é onde você volta</small></span></div><span className="ritual-caption">a volta começa<br />no próximo encontro</span></div>
-          </div>
-        </section>
-
-        <section className="section-wrap final-section">
-          <div className="final-card"><span className="brand-mark large"><Leaf size={23} /></span><h2>O próximo passo não precisa ser grande.</h2><p>Ele só precisa existir.</p><button type="button" className="button button-primary" onClick={() => scrollTo("roteiro")}>Voltar para o encontro <ArrowRight size={17} /></button></div>
-          <div className="disclaimer"><span className="section-kicker">Nota de cuidado</span><p>Recomeçar Hoje é uma ferramenta de apoio à prática devocional. Ele não substitui acompanhamento pastoral, psicológico ou médico. Use o conteúdo com liberdade e interrompa se alguma parte não fizer sentido para o seu momento.</p></div>
-        </section>
-      </main>
-
-      <footer className="site-footer"><div className="section-wrap footer-inner"><span className="brand"><span className="brand-mark"><Leaf size={15} /></span> Recomeçar Hoje</span><span>Feito para voltar sem pagar os dias perdidos.</span></div></footer>
-
-      {notice && <div className="toast" role="status"><Check size={17} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Fechar aviso"><X size={16} /></button></div>}
-
-      {showRitual && <div className="modal-backdrop" role="presentation"><div className="ritual-modal" role="dialog" aria-modal="true" aria-labelledby="ritual-title"><button className="modal-close" type="button" onClick={() => setShowRitual(false)} aria-label="Fechar rito"><X size={20} /></button><span className="section-kicker">Rito de Recomeço</span><h2 id="ritual-title">A culpa quer que você volte para trás.</h2><p>Você pode escolher com clareza o que acontece agora.</p><div className="ritual-choice-grid"><button type="button" className={`ritual-choice recovery ${ritualChoice === "recover" ? "chosen" : ""}`} onClick={() => setRitualChoice("recover")}><span className="ritual-choice-icon"><ArrowDown size={19} /></span><strong>Tentar recuperar os dias perdidos</strong><span>Leitura acumulada, sensação de dívida e um plano difícil de manter.</span></button><button type="button" className={`ritual-choice return ${ritualChoice === "return" ? "chosen" : ""}`} onClick={() => setRitualChoice("return")}><span className="ritual-choice-icon"><RotateCcw size={19} /></span><strong>Voltar para o próximo encontro</strong><span>Começar do ponto atual, fazer uma sessão curta e seguir quando estiver pronto.</span></button></div>{ritualChoice === "recover" && <div className="ritual-feedback negative"><strong>Você não precisa escolher essa dívida.</strong><span>Os dias perdidos não precisam virar uma lista de tarefas.</span></div>}{ritualChoice === "return" && <div className="ritual-feedback positive"><strong>Essa é a rota do Recomeçar Hoje.</strong><span>O próximo encontro está pronto para você.</span></div>}<button className="button button-primary modal-action" type="button" onClick={() => { if (ritualChoice === "return") { setShowRitual(false); startNextEncounter(); } else { setRitualChoice("return"); } }}>{ritualChoice === "return" ? "Voltar agora" : "Escolher a rota possível"} <ArrowRight size={17} /></button></div></div>}
+      <section className="theme-panel surface-card">
+        <div><span className="eyebrow">Preferência visual</span><h3>Escolha como este espaço conversa com você.</h3><p>A paleta fica salva neste navegador. Você pode trocar quando quiser.</p></div>
+        <div className="theme-switcher"><button type="button" className={state.theme === "dark" ? "selected" : ""} onClick={() => toggleTheme("dark")}><Moon size={16} /> Dark</button><button type="button" className={state.theme === "light" ? "selected" : ""} onClick={() => toggleTheme("light")}><Sun size={16} /> Light</button></div>
+      </section>
     </div>
   );
+
+  const renderDiagnostic = () => (
+    <div className="view-stack">
+      <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("home")}><ArrowLeft size={15} /> Início</button><div className="eyebrow">Passo 01 · Seu ponto de partida</div><h1>Como você chegou até aqui?</h1><p className="lead">Responda sem pensar demais. Não é um teste de disciplina. É só uma forma de tirar a próxima escolha das suas costas.</p></section>
+      <div className="flow-progress"><span className="active">01 Ponto de partida</span><span>02 Ritmo</span><span>03 Encontro</span><span>04 Próximo passo</span></div>
+      <section className="diagnostic-panel surface-card">
+        <div className="panel-intro"><span className="panel-number">01</span><div><h2>Primeiro, localize a distância.</h2><p>Escolha a frase que mais se aproxima do que aconteceu, sem usar isso para se julgar.</p></div></div>
+        <div className="option-grid four-columns">{distanceOptions.map(option => <button key={option.value} type="button" className={`option-card ${distance === option.value ? "selected" : ""}`} onClick={() => setDistance(option.value)}><span className="option-radio">{distance === option.value ? <Check size={12} /> : null}</span><strong>{option.label}</strong><small>{option.description}</small></button>)}</div>
+        <div className="panel-divider" />
+        <div className="panel-intro"><span className="panel-number">02</span><div><h2>E o que pesa mais agora?</h2><p>Escolha a dificuldade que você quer que o próximo encontro respeite.</p></div></div>
+        <div className="option-grid two-columns">{difficultyOptions.map(option => <button key={option.value} type="button" className={`option-card ${difficulty === option.value ? "selected" : ""}`} onClick={() => setDifficulty(option.value)}><span className="option-radio">{difficulty === option.value ? <Check size={12} /> : null}</span><strong>{option.label}</strong><small>{option.description}</small></button>)}</div>
+        {recommended ? <div className="recommendation-card"><div className="recommendation-icon">{protocolDetails[recommended].icon}</div><div><span className="eyebrow">Seu ponto de partida pode ser</span><h3>{protocolDetails[recommended].title}</h3><p>{protocolDetails[recommended].detail}</p></div><button className="button button-green" type="button" onClick={continueFromDiagnostic}>Continuar <ArrowRight size={15} /></button></div> : <div className="panel-hint"><Info size={15} /> Escolha uma opção em cada pergunta para receber uma direção.</div>}
+      </section>
+      <section className="quiet-callout"><ShieldCheck size={18} /><div><strong>Você não está sendo medido.</strong><p>O melhor retorno é o que cabe no momento em que você está, não o que parece mais disciplinado.</p></div></section>
+    </div>
+  );
+
+  const renderEncounter = () => {
+    if (state.journeyStep === 0) {
+      return <div className="view-stack"><section className="page-intro compact-intro"><div className="eyebrow">Passo 02 · Seu próximo encontro</div><h1>Antes do roteiro, escolha o seu ponto de partida.</h1><p className="lead">A sequência foi pensada para você não precisar decidir tudo de uma vez.</p></section><section className="flow-gate surface-card"><div className="gate-icon"><Compass size={23} /></div><div><span className="eyebrow">A ordem importa</span><h2>Comece pelo diagnóstico curto.</h2><p>Ele ajuda o encontro a respeitar o seu momento e evita que você escolha um plano grande demais para hoje.</p><button className="button button-green" type="button" onClick={() => go("diagnostico")}>Ir para ponto de partida <ArrowRight size={16} /></button></div></section></div>;
+    }
+    return <div className="view-stack">
+      <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("diagnostico")}><ArrowLeft size={15} /> Ponto de partida</button><div className="eyebrow">Passo 02 · Seu encontro</div><h1>Escolha o ritmo que você tem agora.</h1><p className="lead">Você não precisa provar que consegue fazer mais. Só precisa escolher uma entrada possível.</p></section>
+      <div className="flow-progress"><span className="done">01 Ponto de partida</span><span className={state.journeyStep >= 2 ? "active" : "active"}>02 Ritmo</span><span className={state.journeyStep >= 2 ? "active" : "muted"}>03 Encontro</span><span className={state.journeyStep === 3 ? "active" : "muted"}>04 Próximo passo</span></div>
+      <section className="level-section"><div className="section-title-row"><div><span className="eyebrow">Escolha de agora</span><h2>Quanto cabe no seu momento?</h2></div><span className="section-caption">{state.journeyStep >= 2 ? "roteiro liberado" : "selecione um ritmo"}</span></div><div className="level-grid-app"><button type="button" className={`level-app-card ${state.level === "2" ? "selected" : ""}`} onClick={() => chooseLevel("2")}><span className="level-app-icon"><Zap size={19} /></span><span className="level-app-time">02 min</span><strong>Tenho 2 minutos</strong><small>Uma oração de chegada. O menor passo possível.</small></button><button type="button" className={`level-app-card ${state.level === "10" ? "selected" : ""}`} onClick={() => chooseLevel("10")}><span className="level-app-icon"><Clock3 size={19} /></span><span className="level-app-time">10 min</span><strong>Tenho 10 minutos</strong><small>Passagem, reflexão e oração em um encontro guiado.</small></button><button type="button" className={`level-app-card ${state.level === "calma" ? "selected" : ""}`} onClick={() => chooseLevel("calma")}><span className="level-app-icon"><Leaf size={19} /></span><span className="level-app-time">RITMO CALMO</span><strong>Quero continuar com mais calma</strong><small>Reflexão ampliada e acesso ao próximo encontro.</small></button></div></section>
+      {state.journeyStep >= 2 ? <section className="route-panel surface-card"><div className="route-header-app"><div><span className="eyebrow">Passo 03 · Encontro guiado</span><h2>{completed ? "Você concluiu o encontro." : "Um encontro sem dívida."}</h2><p>{completed ? "A próxima decisão pode ser pequena também." : `${protocolDetails[state.protocol].title} · ${state.level === "2" ? "2 minutos" : state.level === "calma" ? "ritmo calmo" : "10 minutos"}`}</p></div><div className="percent-badge"><strong>{completionPercent}%</strong><small>{state.completedStep} de {steps.length}</small></div></div><div className="route-progress"><span style={{ width: `${completionPercent}%` }} /></div><div className="step-tabs">{steps.map((step, index) => <div key={`${step.title}-${index}`} className={`step-tab ${index < state.completedStep ? "done" : index === currentIndex && !completed ? "active" : ""}`}><span>{index < state.completedStep ? <Check size={12} /> : index + 1}</span><small>{step.eyebrow}</small></div>)}</div>{completed ? <div className="completion-panel"><div className="completion-check"><Check size={23} /></div><div><span className="eyebrow">Encontro concluído</span><h2>Você voltou hoje.</h2><p>Não porque recuperou o que ficou para trás, mas porque escolheu estar presente no próximo passo.</p><div className="identity-quote">“Eu posso voltar sem pagar os dias perdidos.”</div><div className="action-row"><button className="button button-green" type="button" onClick={() => go("rito")}>Ver próximo passo <ArrowRight size={16} /></button><button className="text-button-app" type="button" onClick={() => setNotice("Tudo bem. Você pode continuar quando quiser.")}>Continuar outro dia</button></div></div></div> : <div className="active-step-card"><div className="active-step-icon"><BookOpen size={22} /></div><div className="active-step-main"><div className="step-meta"><span>{steps[currentIndex].time}</span><span>Agora</span></div><h2>{steps[currentIndex].title}</h2><p className="step-prompt-app">{steps[currentIndex].prompt}</p><div className="passage-block"><span>Para este momento</span><p>{steps[currentIndex].passage}</p></div><div className="step-details"><div><span>Faça assim</span><p>{steps[currentIndex].focus}</p></div><div><span>Por que ajuda</span><p>{steps[currentIndex].why}</p></div></div><button className="button button-green" type="button" onClick={completeCurrentStep}>{steps[currentIndex].action} <Check size={16} /></button></div></div>}<div className="route-footnote"><LockKeyhole size={14} /> Salvo neste navegador. Se sair agora, você volta exatamente daqui.</div></section> : null}
+    </div>;
+  };
+
+  const renderSupport = () => (
+    <div className="view-stack">
+      <section className="page-intro compact-intro"><div className="eyebrow">Apoio · quando a escolha pesar</div><h1>Você não precisa descobrir tudo sozinho.</h1><p className="lead">Use esta área quando não souber qual porta abrir. Escolha pelo que está mais verdadeiro hoje, não pelo que parece mais espiritual.</p></section>
+      <section className="section-block"><div className="section-title-row"><div><span className="eyebrow">Quatro portas de entrada</span><h2>Escolha pelo seu momento.</h2></div><span className="section-caption">toque para começar</span></div><div className="protocol-app-grid">{(Object.keys(protocolDetails) as Protocol[]).map(protocol => { const item = protocolDetails[protocol]; return <button key={protocol} type="button" className={`protocol-app-card ${state.protocol === protocol ? "selected" : ""}`} onClick={() => chooseProtocol(protocol)}><span className="protocol-app-icon">{item.icon}</span><span className="protocol-app-label">{item.label}</span><strong>{item.title}</strong><small>{item.description}</small><p>{item.detail}</p><span className="protocol-app-arrow"><ArrowRight size={15} /></span></button>; })}</div></section>
+      <section className="troubleshooter-panel surface-card"><div className="section-title-row"><div><span className="eyebrow">Troubleshooter</span><h2>O que está travando seu retorno?</h2></div><CircleHelp size={22} className="heading-icon" /></div><p className="section-lead">Abra só a situação que parece com a sua. A resposta é curta de propósito, e sempre aponta para uma próxima ação.</p><div className="accordion-list-app">{troubleItems.map((item, index) => <div key={item.title} className={`accordion-app ${openTrouble === index ? "open" : ""}`}><button type="button" className="accordion-trigger-app" onClick={() => setOpenTrouble(openTrouble === index ? null : index)}><span>{item.title}</span><ChevronDown size={17} /></button>{openTrouble === index ? <div className="accordion-answer"><p>{item.answer}</p><button type="button" className="inline-action" onClick={() => chooseProtocol(item.protocol)}>{item.action} <ArrowRight size={14} /></button></div> : null}</div>)}</div></section>
+      <section className="quiet-callout"><Lightbulb size={18} /><div><strong>Uma regra simples.</strong><p>Se uma opção aumentar a culpa, ela não é o próximo passo certo para hoje.</p></div></section>
+    </div>
+  );
+
+  const renderRitual = () => (
+    <div className="view-stack">
+      <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("home")}><ArrowLeft size={15} /> Início</button><div className="eyebrow">Passo 04 · Rito de Recomeço</div><h1>Você vai tentar pagar os dias perdidos ou voltar para o próximo encontro?</h1><p className="lead">Quando a culpa aparecer, não deixe que ela escolha por você. Veja as duas rotas com clareza e escolha a que devolve movimento.</p></section>
+      <div className="flow-progress"><span className={state.journeyStep > 0 ? "done" : ""}>01 Ponto de partida</span><span className={state.journeyStep > 1 ? "done" : ""}>02 Ritmo</span><span className={state.journeyStep > 2 ? "done" : ""}>03 Encontro</span><span className="active">04 Próximo passo</span></div>
+      <section className="ritual-choice-grid-app"><button type="button" className={`ritual-app-card recovery ${ritualChoice === "recover" ? "selected" : ""}`} onClick={() => setRitualChoice("recover")}><span className="ritual-number">A</span><span className="eyebrow">A rota da dívida</span><h2>Tentar recuperar os dias perdidos</h2><p>Você volta para o calendário, calcula o atraso e transforma a prática em uma prova de que consegue compensar.</p><span className="ritual-result"><X size={15} /> aumenta o peso antes de começar</span></button><button type="button" className={`ritual-app-card return ${ritualChoice === "return" ? "selected" : ""}`} onClick={() => setRitualChoice("return")}><span className="ritual-number">B</span><span className="eyebrow">A rota do encontro</span><h2>Voltar para o próximo encontro</h2><p>Você deixa os dias perdidos onde estão e abre uma passagem, uma pergunta e uma oração que cabem em hoje.</p><span className="ritual-result"><Check size={15} /> devolve direção sem punição</span></button></section>
+      {ritualChoice === "recover" ? <div className="ritual-feedback negative"><strong>Perceba o que acontece.</strong><span>Recuperar parece responsável, mas mantém você preso ao primeiro dia que não aconteceu. O retorno não precisa começar ali.</span><button className="button button-outline" type="button" onClick={() => setRitualChoice("return")}>Escolher o próximo encontro <ArrowRight size={15} /></button></div> : null}
+      {ritualChoice === "return" ? <div className="ritual-feedback positive"><strong>É por aqui.</strong><span>Você não precisa recuperar nada para continuar. Um próximo encontro já é uma forma real de voltar.</span><button className="button button-green" type="button" onClick={startNextEncounter}>Abrir próximo encontro <ArrowRight size={15} /></button></div> : null}
+      <section className="remember-grid"><div><span className="remember-number">01</span><strong>Chegue como está.</strong><p>Não espere a vergonha passar para começar.</p></div><div><span className="remember-number">02</span><strong>Faça o que cabe.</strong><p>O encontro certo é o que você consegue sustentar agora.</p></div><div><span className="remember-number">03</span><strong>Saiba como seguir.</strong><p>O próximo passo deve estar claro antes de você sair.</p></div></section>
+      <section className="care-note"><ShieldCheck size={17} /><p>Recomeçar Hoje é uma ferramenta de apoio à prática devocional. Não substitui acompanhamento pastoral, psicológico ou médico. Use com liberdade e interrompa se alguma parte não fizer sentido para o seu momento.</p></section>
+    </div>
+  );
+
+  return <div className={`app-shell theme-${state.theme}`}><div className="ambient-glow" />{renderHeader()}<div className="app-frame">{renderSidebar()}<main className="app-main">{view === "home" ? renderHome() : view === "diagnostico" ? renderDiagnostic() : view === "encontro" ? renderEncounter() : view === "apoio" ? renderSupport() : renderRitual()}</main></div>{renderBottomNav()}<footer className="app-footer"><span><Leaf size={14} /> Recomeçar Hoje</span><span>Feito para voltar sem pagar os dias perdidos.</span></footer>{notice ? <div className="toast-app"><Check size={15} /><span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Fechar aviso"><X size={14} /></button></div> : null}</div>;
 }
