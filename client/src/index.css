@@ -393,7 +393,9 @@ h3 { color: var(--app-text); font-size: 20px; line-height: 1.16; }
   .insight-symbol { width: 39px; height: 39px; }
   .insight-card h3 { font-size: 17px; }
   .theme-panel { align-items: flex-start; flex-direction: column; }
-  .flow-progress { gap: 14px; }
+  .flow-progress { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; overflow: visible; white-space: normal; padding-bottom: 10px; }
+  .flow-progress span { min-width: 0; overflow-wrap: anywhere; text-align: center; font-size: 8px; line-height: 1.25; }
+  .flow-progress span.active::after { right: 12%; bottom: -11px; left: 12%; }
   .diagnostic-panel, .troubleshooter-panel, .route-panel { padding: 19px; }
   .option-grid.four-columns, .option-grid.two-columns { grid-template-columns: 1fr; }
   .recommendation-card { grid-template-columns: 37px 1fr; align-items: start; }
