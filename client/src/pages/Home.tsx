@@ -52,6 +52,20 @@ type RouteStep = {
   action: string;
 };
 
+type BibleTarget = {
+  book: "PSA" | "MAT";
+  chapter: number;
+  start: number;
+  end: number;
+  reference: string;
+  fallback: string;
+};
+
+type BibleState = {
+  status: "idle" | "loading" | "ready" | "fallback";
+  text: string;
+};
+
 const STORAGE_KEY = "recomecar-hoje-app-v2";
 
 const navItems: { id: View; label: string; shortLabel: string; icon: ReactNode }[] = [
@@ -185,6 +199,24 @@ function getRecommendedProtocol(distance?: Distance, difficulty?: Difficulty): P
   return distance === "dias" || distance === "fe" ? "proximo" : "mapa";
 }
 
+function getBibleTarget(level: Level, protocol: Protocol): BibleTarget {
+  if (protocol === "alivio" || protocol === "constrangimento") {
+    return level === "2"
+      ? { book: "MAT", chapter: 11, start: 28, end: 28, reference: "Mateus 11:28", fallback: "Vinde a mim, todos vocês que trabalham e estão sobrecarregados, e eu lhes darei descanso." }
+      : { book: "MAT", chapter: 11, start: 28, end: level === "calma" ? 30 : 29, reference: level === "calma" ? "Mateus 11:28-30" : "Mateus 11:28-29", fallback: level === "calma" ? "Vinde a mim, todos vocês que trabalham e estão sobrecarregados, e eu lhes darei descanso. Tomai sobre vós o meu jugo e aprendei de mim, pois sou manso e humilde de coração; e encontrareis descanso para vossas almas. Pois o meu jugo é fácil, e meu fardo é leve." : "Vinde a mim, todos vocês que trabalham e estão sobrecarregados, e eu lhes darei descanso. Tomai sobre vós o meu jugo e aprendei de mim, pois sou manso e humilde de coração; e encontrareis descanso para vossas almas." };
+  }
+  return level === "calma"
+    ? { book: "PSA", chapter: 23, start: 1, end: 6, reference: "Salmos 23:1-6", fallback: "Yahweh é meu pastor; nada me faltará. Ele me faz deitar em pastos verdes. Ele me conduz ao lado de águas paradas. Ele restaura minha alma. Ele me guia nos caminhos da retidão por causa de seu nome. Embora eu caminhe pelo vale da sombra da morte, eu não temerei nenhum mal, pois vocês estão comigo. Certamente a bondade e a bondade amorosa me acompanharão todos os dias da minha vida, e eu morarei na casa de Yahweh para sempre." }
+    : { book: "PSA", chapter: 23, start: 1, end: 3, reference: "Salmos 23:1-3", fallback: "Yahweh é meu pastor; nada me faltará. Ele me faz deitar em pastos verdes. Ele me conduz ao lado de águas paradas. Ele restaura minha alma. Ele me guia nos caminhos da retidão por causa de seu nome." };
+}
+
+function extractBibleText(payload: { chapter?: { content?: { type?: string; number?: number; content?: (string | { text?: string })[] }[] } }, target: BibleTarget) {
+  const verses = (payload.chapter?.content ?? []).filter(item => item.type === "verse" && typeof item.number === "number" && item.number >= target.start && item.number <= target.end);
+  const text = verses.map(verse => `${verse.number}. ${(verse.content ?? []).map(part => typeof part === "string" ? part : part.text ?? "").join(" ")}`).join(" ");
+  if (!text) throw new Error("A passagem não foi encontrada.");
+  return text;
+}
+
 function getSteps(level: Level, protocol: Protocol): RouteStep[] {
   if (level === "2") {
     return [{
@@ -252,6 +284,8 @@ export default function Home() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const steps = useMemo(() => getSteps(state.level, state.protocol), [state.level, state.protocol]);
+  const bibleTarget = useMemo(() => getBibleTarget(state.level, state.protocol), [state.level, state.protocol]);
+  const [bibleState, setBibleState] = useState<BibleState>({ status: "idle", text: "" });
   const completed = state.completedStep >= steps.length;
   const currentIndex = Math.min(state.completedStep, Math.max(steps.length - 1, 0));
   const completionPercent = Math.min(100, Math.round((state.completedStep / steps.length) * 100));
@@ -264,6 +298,22 @@ export default function Home() {
       : state.journeyStep === 2
         ? { eyebrow: "Passo 03", title: completed ? "Seu encontro está concluído" : "Continue o encontro daqui", copy: completed ? "Você já voltou. Agora escolha como seguir." : `${steps[currentIndex]?.title ?? "Próximo passo"}. O conteúdo está pronto para você.`, button: completed ? "Ver próximo passo" : "Continuar encontro", view: completed ? "rito" as View : "encontro" as View }
         : { eyebrow: "Passo 04", title: "Você não precisa voltar sozinho", copy: "O próximo encontro já está organizado para quando você quiser continuar.", button: "Abrir próximo passo", view: "rito" as View };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setBibleState({ status: "loading", text: "" });
+    fetch(`https://bible.helloao.org/api/por_bsl/${bibleTarget.book}/${bibleTarget.chapter}.json`, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error("Falha ao carregar a passagem.");
+        return response.json();
+      })
+      .then(payload => setBibleState({ status: "ready", text: extractBibleText(payload, bibleTarget) }))
+      .catch(error => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setBibleState({ status: "fallback", text: bibleTarget.fallback });
+      });
+    return () => controller.abort();
+  }, [bibleTarget]);
 
   useEffect(() => {
     try {
@@ -322,6 +372,15 @@ export default function Home() {
     setState(current => ({ ...current, theme: nextTheme }));
     setNotice(nextTheme === "dark" ? "Tema escuro ativado." : "Tema claro ativado.");
   };
+
+  const renderBibleCard = () => (
+    <div className="bible-card">
+      <div className="bible-card-top"><span className="eyebrow"><BookOpen size={13} /> Texto sugerido</span><span className="bible-version">Bíblia Portuguesa Mundial</span></div>
+      <strong className="bible-reference">{bibleTarget.reference}</strong>
+      <p className={`bible-text ${bibleState.status === "loading" ? "is-loading" : ""}`}>{bibleState.status === "loading" ? "Abrindo a passagem para você..." : `“${bibleState.text}”`}</p>
+      <div className="bible-card-foot"><span><ShieldCheck size={13} /> {bibleState.status === "fallback" ? "Texto disponível sem conexão" : "Texto carregado automaticamente"}</span><span>Tradução fixa no app</span></div>
+    </div>
+  );
 
   const renderHeader = () => (
     <header className="app-header">
@@ -472,7 +531,7 @@ export default function Home() {
       <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("diagnostico")}><ArrowLeft size={15} /> Ponto de partida</button><div className="eyebrow">Passo 02 · Seu encontro</div><h1>Escolha o seu ritmo.</h1><p className="lead">Você não precisa provar que consegue fazer mais. Só precisa escolher uma entrada possível.</p></section>
       <div className="flow-progress"><span className="done">01 Ponto de partida</span><span className={state.journeyStep >= 2 ? "active" : "active"}>02 Ritmo</span><span className={state.journeyStep >= 2 ? "active" : "muted"}>03 Encontro</span><span className={state.journeyStep === 3 ? "active" : "muted"}>04 Próximo passo</span></div>
       <section className="level-section"><div className="section-title-row"><div><span className="eyebrow">Escolha de agora</span><h2>Quanto cabe no seu momento?</h2></div><span className="section-caption">{state.journeyStep >= 2 ? "roteiro liberado" : "selecione um ritmo"}</span></div><div className="level-grid-app"><button type="button" className={`level-app-card ${state.level === "2" ? "selected" : ""}`} onClick={() => chooseLevel("2")}><span className="level-app-icon"><Zap size={19} /></span><span className="level-app-time">02 min</span><strong>Tenho 2 minutos</strong><small>Uma oração de chegada. O menor passo possível.</small></button><button type="button" className={`level-app-card ${state.level === "10" ? "selected" : ""}`} onClick={() => chooseLevel("10")}><span className="level-app-icon"><Clock3 size={19} /></span><span className="level-app-time">10 min</span><strong>Tenho 10 minutos</strong><small>Passagem, reflexão e oração em um encontro guiado.</small></button><button type="button" className={`level-app-card ${state.level === "calma" ? "selected" : ""}`} onClick={() => chooseLevel("calma")}><span className="level-app-icon"><Leaf size={19} /></span><span className="level-app-time">RITMO CALMO</span><strong>Quero continuar com mais calma</strong><small>Reflexão ampliada e acesso ao próximo encontro.</small></button></div></section>
-      {state.journeyStep >= 2 ? <section className="route-panel surface-card"><div className="route-header-app"><div><span className="eyebrow">Passo 03 · Encontro guiado</span><h2>{completed ? "Você concluiu o encontro." : "Um encontro sem dívida."}</h2><p>{completed ? "A próxima decisão pode ser pequena também." : `${protocolDetails[state.protocol].title} · ${state.level === "2" ? "2 minutos" : state.level === "calma" ? "ritmo calmo" : "10 minutos"}`}</p></div><div className="percent-badge"><strong>{completionPercent}%</strong><small>{state.completedStep} de {steps.length}</small></div></div><div className="route-progress"><span style={{ width: `${completionPercent}%` }} /></div><div className="step-tabs">{steps.map((step, index) => <div key={`${step.title}-${index}`} className={`step-tab ${index < state.completedStep ? "done" : index === currentIndex && !completed ? "active" : ""}`}><span>{index < state.completedStep ? <Check size={12} /> : index + 1}</span><small>{step.eyebrow}</small></div>)}</div>{completed ? <div className="completion-panel"><div className="completion-check"><Check size={23} /></div><div><span className="eyebrow">Encontro concluído</span><h2>Você voltou hoje.</h2><p>Não porque recuperou o que ficou para trás, mas porque escolheu estar presente no próximo passo.</p><div className="identity-quote">“Eu posso voltar sem pagar os dias perdidos.”</div><div className="action-row"><button className="button button-green" type="button" onClick={() => go("rito")}>Ver próximo passo <ArrowRight size={16} /></button><button className="text-button-app" type="button" onClick={() => setNotice("Tudo bem. Você pode continuar quando quiser.")}>Continuar outro dia</button></div></div></div> : <div className="active-step-card"><div className="active-step-icon"><BookOpen size={22} /></div><div className="active-step-main"><div className="step-meta"><span>{steps[currentIndex].time}</span><span>Agora</span></div><h2>{steps[currentIndex].title}</h2><p className="step-prompt-app">{steps[currentIndex].prompt}</p><div className="passage-block"><span>Para este momento</span><p>{steps[currentIndex].passage}</p></div><div className="step-details"><div><span>Faça assim</span><p>{steps[currentIndex].focus}</p></div><div><span>Por que ajuda</span><p>{steps[currentIndex].why}</p></div></div><button className="button button-green" type="button" onClick={completeCurrentStep}>{steps[currentIndex].action} <Check size={16} /></button></div></div>}<div className="route-footnote"><LockKeyhole size={14} /> Salvo neste navegador. Se sair agora, você volta exatamente daqui.</div></section> : null}
+      {state.journeyStep >= 2 ? <section className="route-panel surface-card"><div className="route-header-app"><div><span className="eyebrow">Passo 03 · Encontro guiado</span><h2>{completed ? "Você concluiu o encontro." : "Um encontro sem dívida."}</h2><p>{completed ? "A próxima decisão pode ser pequena também." : `${protocolDetails[state.protocol].title} · ${state.level === "2" ? "2 minutos" : state.level === "calma" ? "ritmo calmo" : "10 minutos"}`}</p></div><div className="percent-badge"><strong>{completionPercent}%</strong><small>{state.completedStep} de {steps.length}</small></div></div><div className="route-progress"><span style={{ width: `${completionPercent}%` }} /></div><div className="step-tabs">{steps.map((step, index) => <div key={`${step.title}-${index}`} className={`step-tab ${index < state.completedStep ? "done" : index === currentIndex && !completed ? "active" : ""}`}><span>{index < state.completedStep ? <Check size={12} /> : index + 1}</span><small>{step.eyebrow}</small></div>)}</div>{completed ? <div className="completion-panel"><div className="completion-check"><Check size={23} /></div><div><span className="eyebrow">Encontro concluído</span><h2>Você voltou hoje.</h2><p>Não porque recuperou o que ficou para trás, mas porque escolheu estar presente no próximo passo.</p><div className="identity-quote">“Eu posso voltar sem pagar os dias perdidos.”</div><div className="action-row"><button className="button button-green" type="button" onClick={() => go("rito")}>Ver próximo passo <ArrowRight size={16} /></button><button className="text-button-app" type="button" onClick={() => setNotice("Tudo bem. Você pode continuar quando quiser.")}>Continuar outro dia</button></div></div></div> : <div className="active-step-card"><div className="active-step-icon"><BookOpen size={22} /></div><div className="active-step-main"><div className="step-meta"><span>{steps[currentIndex].time}</span><span>Agora</span></div><h2>{steps[currentIndex].title}</h2><p className="step-prompt-app">{steps[currentIndex].prompt}</p>{currentIndex === 0 ? renderBibleCard() : null}<div className="passage-block"><span>Para este momento</span><p>{steps[currentIndex].passage}</p></div><div className="step-details"><div><span>Faça assim</span><p>{steps[currentIndex].focus}</p></div><div><span>Por que ajuda</span><p>{steps[currentIndex].why}</p></div></div><button className="button button-green" type="button" onClick={completeCurrentStep}>{steps[currentIndex].action} <Check size={16} /></button></div></div>}<div className="route-footnote"><LockKeyhole size={14} /> Salvo neste navegador. Se sair agora, você volta exatamente daqui.</div></section> : null}
     </div>;
   };
 

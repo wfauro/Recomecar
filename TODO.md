@@ -33,3 +33,9 @@
 - [x] Validar TypeScript, testes, build e Preview em desktop e mobile.
 - [x] Testar a sequência de diagnóstico, escolha de ritmo, avanço de etapas, conclusão, tema e navegação inferior.
 - [x] Salvar checkpoint e publicar a nova versão.
+
+## Texto bíblico e responsividade
+- [x] Usar a Bíblia Portuguesa Mundial como tradução fixa para as passagens sugeridas em todos os modos do encontro.
+- [x] Carregar a passagem sugerida por uma API pública sem chave, mostrar um versículo curto no modo de 2 minutos e uma passagem completa nos modos de 10 minutos e ritmo calmo.
+- [x] Manter fallback local para o texto bíblico quando a API estiver indisponível, sem interromper o encontro.
+- [x] Corrigir a seção “Escolha o seu ritmo” para que os três botões fiquem inteiramente visíveis e tocáveis no mobile.
