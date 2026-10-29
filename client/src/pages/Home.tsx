@@ -80,7 +80,6 @@ const journeySteps: { number: string; title: string; description: string; view: 
   { number: "01", title: "Ponto de partida", description: "Entenda o que você precisa agora.", view: "diagnostico", icon: <Compass size={18} /> },
   { number: "02", title: "Ritmo de agora", description: "Escolha o tempo que você realmente tem.", view: "encontro", icon: <Timer size={18} /> },
   { number: "03", title: "Encontro guiado", description: "Leia, reflita e faça sua oração possível.", view: "encontro", icon: <BookOpen size={18} /> },
-  { number: "04", title: "Próximo passo", description: "Saia sabendo como continuar.", view: "rito", icon: <Route size={18} /> },
 ];
 
 const protocolDetails: Record<Protocol, { title: string; description: string; icon: ReactNode; label: string; detail: string }> = {
@@ -219,16 +218,38 @@ function extractBibleText(payload: { chapter?: { content?: { type?: string; numb
 
 function getSteps(level: Level, protocol: Protocol): RouteStep[] {
   if (level === "2") {
-    return [{
-      time: "2 min",
-      eyebrow: "Modo Alívio",
-      title: "Faça uma oração de chegada",
-      prompt: "Diga uma frase verdadeira sobre como você chegou hoje.",
-      passage: "Você pode começar assim: “Deus, eu estou aqui, mesmo sem saber por onde começar.”",
-      focus: "Não procure a frase perfeita. Apenas nomeie a sua presença.",
-      why: "Um começo pequeno reduz a pressão e torna a volta possível sem criar outra cobrança.",
-      action: "Fazer minha oração",
-    }];
+    return [
+      {
+        time: "1 min",
+        eyebrow: "Ler",
+        title: "Leia uma frase que acolhe",
+        prompt: "Leia a passagem sugerida sem tentar fazer mais do que cabe agora.",
+        passage: "Receba uma frase de descanso como o seu ponto de chegada hoje.",
+        focus: "Leia uma vez, devagar, e perceba a palavra que mais chama sua atenção.",
+        why: "Um começo pequeno reduz a pressão e torna a volta possível sem criar outra cobrança.",
+        action: "Concluir leitura",
+      },
+      {
+        time: "30 s",
+        eyebrow: "Meditar",
+        title: "Fique com uma palavra",
+        prompt: "Escolha uma palavra da passagem para levar com você neste momento.",
+        passage: "Você não precisa explicar o texto. Apenas perceba o que ele desperta em você.",
+        focus: "Respire e permaneça alguns instantes com essa palavra.",
+        why: "Uma pausa breve transforma a leitura em presença, sem exigir uma reflexão longa.",
+        action: "Concluir reflexão",
+      },
+      {
+        time: "30 s",
+        eyebrow: "Orar",
+        title: "Faça uma oração de chegada",
+        prompt: "Diga uma frase verdadeira sobre como você chegou hoje.",
+        passage: "Você pode começar assim: “Deus, eu estou aqui, mesmo sem saber por onde começar.”",
+        focus: "Não procure a frase perfeita. Apenas nomeie a sua presença.",
+        why: "A oração possível encerra o encontro sem criar outra cobrança.",
+        action: "Finalizar encontro",
+      },
+    ];
   }
   if (level === "calma") {
     return [
@@ -291,13 +312,15 @@ export default function Home() {
   const completionPercent = Math.min(100, Math.round((state.completedStep / steps.length) * 100));
   const recommended = getRecommendedProtocol(distance, difficulty);
   const isReturningAfterGap = state.completedStep > 0 && !completed && Date.now() - state.lastVisitedAt > 36 * 60 * 60 * 1000;
-  const nextAction = state.journeyStep === 0
+  const nextAction = completed
+    ? { eyebrow: "Encontro concluído", title: "Você voltou hoje", copy: "A jornada terminou. Escolha como seguir sem transformar o próximo passo em cobrança.", button: "Finalizar encontro", view: "rito" as View }
+    : state.journeyStep === 0
     ? { eyebrow: "Passo 01", title: "Escolha seu ponto de partida", copy: "Duas respostas rápidas para tirar a escolha das suas costas.", button: "Começar agora", view: "diagnostico" as View }
     : state.journeyStep === 1
       ? { eyebrow: "Passo 02", title: "Escolha o ritmo de agora", copy: "Não escolha o que gostaria de conseguir. Escolha o tempo que realmente tem.", button: "Escolher meu ritmo", view: "encontro" as View }
-      : state.journeyStep === 2
-        ? { eyebrow: "Passo 03", title: completed ? "Seu encontro está concluído" : "Continue o encontro daqui", copy: completed ? "Você já voltou. Agora escolha como seguir." : `${steps[currentIndex]?.title ?? "Próximo passo"}. O conteúdo está pronto para você.`, button: completed ? "Ver próximo passo" : "Continuar encontro", view: completed ? "rito" as View : "encontro" as View }
-        : { eyebrow: "Passo 04", title: "Você não precisa voltar sozinho", copy: "O próximo encontro já está organizado para quando você quiser continuar.", button: "Abrir próximo passo", view: "rito" as View };
+    : state.journeyStep === 2
+        ? { eyebrow: "Encontro", title: "Continue o encontro daqui", copy: `${steps[currentIndex]?.title ?? "Próximo passo"}. O conteúdo está pronto para você.`, button: "Continuar encontro", view: "encontro" as View }
+        : { eyebrow: "Pós-encontro", title: "Você não precisa voltar sozinho", copy: "O próximo encontro já está organizado para quando você quiser continuar.", button: "Finalizar encontro", view: "rito" as View };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -391,7 +414,7 @@ export default function Home() {
         </button>
         <div className="header-context">
           <span className="live-dot" />
-          {completed ? "Encontro concluído" : state.journeyStep === 0 ? "Um passo de cada vez" : `Passo ${String(Math.min(state.journeyStep + 1, 4)).padStart(2, "0")} de 04`}
+            {completed ? "Encontro concluído" : state.journeyStep === 0 ? "Um passo de cada vez" : "Encontro em andamento"}
         </div>
         <div className="header-actions">
           <span className="desktop-only privacy-chip"><ShieldCheck size={14} /> Sem streak</span>
@@ -416,8 +439,8 @@ export default function Home() {
         ))}
       </nav>
       <div className="side-progress">
-        <div className="side-progress-head"><span>Seu progresso</span><strong>{state.journeyStep}/4</strong></div>
-        <div className="mini-progress"><span style={{ width: `${(state.journeyStep / 4) * 100}%` }} /></div>
+        <div className="side-progress-head"><span>Seu progresso</span><strong>{state.completedStep}/{steps.length}</strong></div>
+        <div className="mini-progress"><span style={{ width: `${completionPercent}%` }} /></div>
         <p>Sem cobrança. O ponto é saber voltar.</p>
       </div>
       <div className="side-footer"><LockKeyhole size={13} /> Salvo neste navegador</div>
@@ -456,7 +479,7 @@ export default function Home() {
 
       <section className="home-grid">
         <article className="next-action-card surface-card">
-          <div className="card-topline"><span className="eyebrow">{nextAction.eyebrow}</span><span className="step-badge">{String(Math.min(state.journeyStep + 1, 4)).padStart(2, "0")}/04</span></div>
+          <div className="card-topline"><span className="eyebrow">{nextAction.eyebrow}</span><span className="step-badge">{String(Math.min(state.journeyStep + 1, 3)).padStart(2, "0")}/03</span></div>
           <div className="next-action-icon"><Zap size={21} fill="currentColor" /></div>
           <h2>{nextAction.title}</h2>
           <p>{nextAction.copy}</p>
@@ -476,7 +499,7 @@ export default function Home() {
       </section>
 
       <section className="section-block">
-        <div className="section-title-row"><div><span className="eyebrow">Sua sequência</span><h2>Um caminho, não um labirinto.</h2></div><span className="section-caption">{state.journeyStep === 3 ? "caminho concluído" : `${4 - state.journeyStep} passos restantes`}</span></div>
+        <div className="section-title-row"><div><span className="eyebrow">Sua sequência</span><h2>Um caminho, não um labirinto.</h2></div><span className="section-caption">{state.journeyStep === 3 ? "caminho concluído" : `${3 - state.journeyStep} passos restantes`}</span></div>
         <div className="journey-list">
           {journeySteps.map((step, index) => {
             const done = index < state.journeyStep;
@@ -510,7 +533,7 @@ export default function Home() {
   const renderDiagnostic = () => (
     <div className="view-stack">
       <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("home")}><ArrowLeft size={15} /> Início</button><div className="eyebrow">Passo 01 · Seu ponto de partida</div><h1>Como você chegou até aqui?</h1><p className="lead">Responda sem pensar demais. Não é um teste de disciplina. É só uma forma de tirar a próxima escolha das suas costas.</p></section>
-      <div className="flow-progress"><span className="active">01 Ponto de partida</span><span>02 Ritmo</span><span>03 Encontro</span><span>04 Próximo passo</span></div>
+      <div className="flow-progress"><span className="active">01 Ponto de partida</span><span>02 Ritmo</span><span>03 Encontro</span></div>
       <section className="diagnostic-panel surface-card">
         <div className="panel-intro"><span className="panel-number">01</span><div><h2>Primeiro, localize a distância.</h2><p>Escolha a frase que mais se aproxima do que aconteceu, sem usar isso para se julgar.</p></div></div>
         <div className="option-grid four-columns">{distanceOptions.map(option => <button key={option.value} type="button" className={`option-card ${distance === option.value ? "selected" : ""}`} onClick={() => setDistance(option.value)}><span className="option-radio">{distance === option.value ? <Check size={12} /> : null}</span><strong>{option.label}</strong><small>{option.description}</small></button>)}</div>
@@ -529,9 +552,9 @@ export default function Home() {
     }
     return <div className="view-stack">
       <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("diagnostico")}><ArrowLeft size={15} /> Ponto de partida</button><div className="eyebrow">Passo 02 · Seu encontro</div><h1>Escolha o seu ritmo.</h1><p className="lead">Você não precisa provar que consegue fazer mais. Só precisa escolher uma entrada possível.</p></section>
-      <div className="flow-progress"><span className="done">01 Ponto de partida</span><span className={state.journeyStep >= 2 ? "active" : "active"}>02 Ritmo</span><span className={state.journeyStep >= 2 ? "active" : "muted"}>03 Encontro</span><span className={state.journeyStep === 3 ? "active" : "muted"}>04 Próximo passo</span></div>
+      <div className="flow-progress"><span className={state.completedStep > 0 ? "done" : "active"}>01 Ler</span><span className={state.completedStep > 1 ? "done" : state.completedStep === 1 ? "active" : "muted"}>02 Meditar</span><span className={state.completedStep >= 3 ? "done active" : state.completedStep === 2 ? "active" : "muted"}>03 Orar</span></div>
       <section className="level-section"><div className="section-title-row"><div><span className="eyebrow">Escolha de agora</span><h2>Quanto cabe no seu momento?</h2></div><span className="section-caption">{state.journeyStep >= 2 ? "roteiro liberado" : "selecione um ritmo"}</span></div><div className="level-grid-app"><button type="button" className={`level-app-card ${state.level === "2" ? "selected" : ""}`} onClick={() => chooseLevel("2")}><span className="level-app-icon"><Zap size={19} /></span><span className="level-app-time">02 min</span><strong>Tenho 2 minutos</strong><small>Uma oração de chegada. O menor passo possível.</small></button><button type="button" className={`level-app-card ${state.level === "10" ? "selected" : ""}`} onClick={() => chooseLevel("10")}><span className="level-app-icon"><Clock3 size={19} /></span><span className="level-app-time">10 min</span><strong>Tenho 10 minutos</strong><small>Passagem, reflexão e oração em um encontro guiado.</small></button><button type="button" className={`level-app-card ${state.level === "calma" ? "selected" : ""}`} onClick={() => chooseLevel("calma")}><span className="level-app-icon"><Leaf size={19} /></span><span className="level-app-time">RITMO CALMO</span><strong>Quero continuar com mais calma</strong><small>Reflexão ampliada e acesso ao próximo encontro.</small></button></div></section>
-      {state.journeyStep >= 2 ? <section className="route-panel surface-card"><div className="route-header-app"><div><span className="eyebrow">Passo 03 · Encontro guiado</span><h2>{completed ? "Você concluiu o encontro." : "Um encontro sem dívida."}</h2><p>{completed ? "A próxima decisão pode ser pequena também." : `${protocolDetails[state.protocol].title} · ${state.level === "2" ? "2 minutos" : state.level === "calma" ? "ritmo calmo" : "10 minutos"}`}</p></div><div className="percent-badge"><strong>{completionPercent}%</strong><small>{state.completedStep} de {steps.length}</small></div></div><div className="route-progress"><span style={{ width: `${completionPercent}%` }} /></div><div className="step-tabs">{steps.map((step, index) => <div key={`${step.title}-${index}`} className={`step-tab ${index < state.completedStep ? "done" : index === currentIndex && !completed ? "active" : ""}`}><span>{index < state.completedStep ? <Check size={12} /> : index + 1}</span><small>{step.eyebrow}</small></div>)}</div>{completed ? <div className="completion-panel"><div className="completion-check"><Check size={23} /></div><div><span className="eyebrow">Encontro concluído</span><h2>Você voltou hoje.</h2><p>Não porque recuperou o que ficou para trás, mas porque escolheu estar presente no próximo passo.</p><div className="identity-quote">“Eu posso voltar sem pagar os dias perdidos.”</div><div className="action-row"><button className="button button-green" type="button" onClick={() => go("rito")}>Ver próximo passo <ArrowRight size={16} /></button><button className="text-button-app" type="button" onClick={() => setNotice("Tudo bem. Você pode continuar quando quiser.")}>Continuar outro dia</button></div></div></div> : <div className="active-step-card"><div className="active-step-icon"><BookOpen size={22} /></div><div className="active-step-main"><div className="step-meta"><span>{steps[currentIndex].time}</span><span>Agora</span></div><h2>{steps[currentIndex].title}</h2><p className="step-prompt-app">{steps[currentIndex].prompt}</p>{currentIndex === 0 ? renderBibleCard() : null}<div className="passage-block"><span>Para este momento</span><p>{steps[currentIndex].passage}</p></div><div className="step-details"><div><span>Faça assim</span><p>{steps[currentIndex].focus}</p></div><div><span>Por que ajuda</span><p>{steps[currentIndex].why}</p></div></div><button className="button button-green" type="button" onClick={completeCurrentStep}>{steps[currentIndex].action} <Check size={16} /></button></div></div>}<div className="route-footnote"><LockKeyhole size={14} /> Salvo neste navegador. Se sair agora, você volta exatamente daqui.</div></section> : null}
+      {state.journeyStep >= 2 ? <section className="route-panel surface-card"><div className="route-header-app"><div><span className="eyebrow">Passo 03 · Encontro guiado</span><h2>{completed ? "Você concluiu o encontro." : "Um encontro sem dívida."}</h2><p>{completed ? "A próxima decisão pode ser pequena também." : `${protocolDetails[state.protocol].title} · ${state.level === "2" ? "2 minutos" : state.level === "calma" ? "ritmo calmo" : "10 minutos"}`}</p></div><div className="percent-badge"><strong>{completionPercent}%</strong><small>{state.completedStep} de {steps.length}</small></div></div><div className="route-progress"><span style={{ width: `${completionPercent}%` }} /></div><div className="step-tabs">{steps.map((step, index) => <div key={`${step.title}-${index}`} className={`step-tab ${index < state.completedStep ? "done" : index === currentIndex && !completed ? "active" : ""}`}><span>{index < state.completedStep ? <Check size={12} /> : index + 1}</span><small>{step.eyebrow}</small></div>)}</div>{completed ? <div className="completion-panel"><div className="completion-check"><Check size={23} /></div><div><span className="eyebrow">Encontro concluído</span><h2>Você voltou hoje.</h2><p>Não porque recuperou o que ficou para trás, mas porque escolheu estar presente no próximo passo.</p><div className="identity-quote">“Eu posso voltar sem pagar os dias perdidos.”</div><div className="action-row"><button className="button button-green" type="button" onClick={() => go("rito")}>Finalizar encontro <ArrowRight size={16} /></button><button className="text-button-app" type="button" onClick={() => setNotice("Tudo bem. Você pode continuar quando quiser.")}>Continuar outro dia</button></div></div></div> : <div className="active-step-card"><div className="active-step-icon"><BookOpen size={22} /></div><div className="active-step-main"><div className="step-meta"><span>{steps[currentIndex].time}</span><span>Agora</span></div><h2>{steps[currentIndex].title}</h2><p className="step-prompt-app">{steps[currentIndex].prompt}</p>{currentIndex === 0 ? renderBibleCard() : null}<div className="passage-block"><span>Para este momento</span><p>{steps[currentIndex].passage}</p></div><div className="step-details"><div><span>Faça assim</span><p>{steps[currentIndex].focus}</p></div><div><span>Por que ajuda</span><p>{steps[currentIndex].why}</p></div></div><button className="button button-green" type="button" onClick={completeCurrentStep}>{steps[currentIndex].action} <Check size={16} /></button></div></div>}<div className="route-footnote"><LockKeyhole size={14} /> Salvo neste navegador. Se sair agora, você volta exatamente daqui.</div></section> : null}
     </div>;
   };
 
@@ -546,8 +569,7 @@ export default function Home() {
 
   const renderRitual = () => (
     <div className="view-stack">
-      <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("home")}><ArrowLeft size={15} /> Início</button><div className="eyebrow">Passo 04 · Rito de Recomeço</div><h1>Você vai tentar pagar os dias perdidos ou voltar para o próximo encontro?</h1><p className="lead">Quando a culpa aparecer, não deixe que ela escolha por você. Veja as duas rotas com clareza e escolha a que devolve movimento.</p></section>
-      <div className="flow-progress"><span className={state.journeyStep > 0 ? "done" : ""}>01 Ponto de partida</span><span className={state.journeyStep > 1 ? "done" : ""}>02 Ritmo</span><span className={state.journeyStep > 2 ? "done" : ""}>03 Encontro</span><span className="active">04 Próximo passo</span></div>
+      <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("home")}><ArrowLeft size={15} /> Início</button><div className="eyebrow">Pós-encontro · Rito de Recomeço</div><h1>Você vai tentar pagar os dias perdidos ou voltar para o próximo encontro?</h1><p className="lead">Quando a culpa aparecer, não deixe que ela escolha por você. Veja as duas rotas com clareza e escolha a que devolve movimento.</p></section>
       <section className="ritual-choice-grid-app"><button type="button" className={`ritual-app-card recovery ${ritualChoice === "recover" ? "selected" : ""}`} onClick={() => setRitualChoice("recover")}><span className="ritual-number">A</span><span className="eyebrow">A rota da dívida</span><h2>Tentar recuperar os dias perdidos</h2><p>Você volta para o calendário, calcula o atraso e transforma a prática em uma prova de que consegue compensar.</p><span className="ritual-result"><X size={15} /> aumenta o peso antes de começar</span></button><button type="button" className={`ritual-app-card return ${ritualChoice === "return" ? "selected" : ""}`} onClick={() => setRitualChoice("return")}><span className="ritual-number">B</span><span className="eyebrow">A rota do encontro</span><h2>Voltar para o próximo encontro</h2><p>Você deixa os dias perdidos onde estão e abre uma passagem, uma pergunta e uma oração que cabem em hoje.</p><span className="ritual-result"><Check size={15} /> devolve direção sem punição</span></button></section>
       {ritualChoice === "recover" ? <div className="ritual-feedback negative"><strong>Perceba o que acontece.</strong><span>Recuperar parece responsável, mas mantém você preso ao primeiro dia que não aconteceu. O retorno não precisa começar ali.</span><button className="button button-outline" type="button" onClick={() => setRitualChoice("return")}>Escolher o próximo encontro <ArrowRight size={15} /></button></div> : null}
       {ritualChoice === "return" ? <div className="ritual-feedback positive"><strong>É por aqui.</strong><span>Você não precisa recuperar nada para continuar. Um próximo encontro já é uma forma real de voltar.</span><button className="button button-green" type="button" onClick={startNextEncounter}>Abrir próximo encontro <ArrowRight size={15} /></button></div> : null}
