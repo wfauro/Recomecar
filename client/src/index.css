@@ -288,6 +288,7 @@ h3 { color: var(--app-text); font-size: 20px; line-height: 1.16; }
 .completion-panel h2 { margin: 9px 0 8px; font-size: 28px; }
 .completion-panel p { max-width: 540px; margin: 0 0 15px; color: var(--muted-strong); font-size: 13px; line-height: 1.55; }
 .identity-quote { margin: 0 0 20px; padding: 12px 14px; border-left: 2px solid var(--brand); color: var(--app-text); background: var(--surface-2); font: 700 13px "Sora", sans-serif; }
+.identity-quote small { display: block; margin-top: 4px; color: var(--muted); font: 600 11px "Sora", sans-serif; }
 .action-row { display: flex; align-items: center; gap: 17px; flex-wrap: wrap; }
 .text-button-app { border: 0; padding: 8px 0; color: var(--muted); background: transparent; font-size: 12px; font-weight: 800; }
 .text-button-app:hover { color: var(--brand); }
