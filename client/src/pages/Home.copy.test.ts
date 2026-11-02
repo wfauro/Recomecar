@@ -10,7 +10,7 @@ describe("Home.tsx product decisions", () => {
     ["'Continuar outro dia' (button or text)", /[Cc]ontinu\w+ outro dia/],
     ["the wipe-everything restart", /restartFromZero/],
     ["the 'Meses ou mais' option", /Meses ou mais|"meses"/],
-    ["the 'Algumas semanas' option", /Algumas semanas|"semanas"/],
+    ["any wording that presumes how long the person was away", /semanas|meses|Fiquei \w+ sem/i],
     ["the absence timer", /lastVisitedAt|isReturningAfterGap/],
     ["the debt route", /rota da dívida|Tentar compensar/],
     ["'Escolha como seguir'", /[Ee]scolha como seguir/],

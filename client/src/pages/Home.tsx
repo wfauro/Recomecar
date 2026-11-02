@@ -125,7 +125,7 @@ const difficultyOptions: { value: Difficulty; label: string; description: string
 
 const troubleItems: { title: string; answer: string; protocol: Protocol; action: string }[] = [
   {
-    title: "Fiquei semanas sem abrir a Bíblia e agora não sei por onde começar",
+    title: "Quando quiser recomeçar",
     answer: "Você pode começar por qualquer ponto. Abra uma passagem curta, observe o que toca seu momento atual e pare antes de transformar a volta em um plano impossível.",
     protocol: "mapa",
     action: "Abrir Mapa do Retorno",
