@@ -3,10 +3,19 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config";
 
 export async function setupVite(app: Express, server: Server) {
+  // `vite` is a devDependency: load it only in development so the production
+  // bundle starts even when only production dependencies are installed.
+  const { createServer: createViteServer } = await import("vite");
+  // The config path is kept in a variable on purpose: with a literal path,
+  // esbuild would inline vite.config.ts and hoist its devDependency imports
+  // (vite plugins) to the top of the production bundle.
+  const viteConfigPath = "../../vite.config";
+  const { default: viteConfig } = (await import(viteConfigPath)) as {
+    default: Record<string, unknown>;
+  };
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
