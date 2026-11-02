@@ -391,7 +391,7 @@ export default function Home() {
       <div className="bible-card-top"><span className="eyebrow"><BookOpen size={13} /> Texto sugerido</span><span className="bible-version">Bíblia Portuguesa Mundial</span></div>
       <strong className="bible-reference">{bibleTarget.reference}</strong>
       <p className={`bible-text ${bibleState.status === "loading" ? "is-loading" : ""}`}>{bibleState.status === "loading" ? "Abrindo a passagem para você..." : `“${bibleState.text}”`}</p>
-      <div className="bible-card-foot"><span><ShieldCheck size={13} /> {bibleState.status === "fallback" ? "Texto disponível sem conexão" : "Texto carregado automaticamente"}</span><span>Tradução fixa no app</span></div>
+      <div className="bible-card-foot"><span><ShieldCheck size={13} /> {bibleState.status === "fallback" ? "Texto disponível sem conexão" : "Texto carregado automaticamente"}</span><a className="bible-source" href="https://ebible.org/Scriptures/details.php?id=porbrbsl" target="_blank" rel="noopener noreferrer" aria-label="Abrir a fonte da Bíblia Portuguesa Mundial">Fonte: Bíblia Portuguesa Mundial</a></div>
     </div>
   );
 

@@ -276,6 +276,8 @@ h3 { color: var(--app-text); font-size: 20px; line-height: 1.16; }
 .bible-card-foot { padding-top: 11px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 9px; }
 .bible-card-foot span { display: inline-flex; align-items: center; gap: 5px; }
 .bible-card-foot svg { color: var(--brand); }
+.bible-card-foot a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.bible-card-foot a:hover { color: var(--brand); }
 .passage-block { margin-bottom: 17px; padding: 14px 15px; border-left: 2px solid var(--brand); background: var(--surface-2); }
 .passage-block span, .step-details span { display: block; color: var(--brand); text-transform: uppercase; letter-spacing: .1em; font-size: 9px; font-weight: 800; }
 .passage-block p { margin: 6px 0 0; color: var(--muted-strong); font-size: 12px; line-height: 1.5; }
