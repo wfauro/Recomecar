@@ -28,16 +28,21 @@ describe("production bundle does not require devDependencies", () => {
     const output = result.outputFiles[0].text;
 
     const specifiers = new Set<string>();
-    for (const match of output.matchAll(/^import\s+(?:[^;]*?\s+from\s+)?["']([^"']+)["']/gm)) {
+    for (const match of output.matchAll(
+      /^import\s+(?:[^;]*?\s+from\s+)?["']([^"']+)["']/gm
+    )) {
       specifiers.add(match[1]);
     }
 
-    const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8"));
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(root, "package.json"), "utf-8")
+    );
     const runtime = new Set(Object.keys(pkg.dependencies ?? {}));
     const builtins = new Set(builtinModules);
 
     const missing = [...specifiers].filter(specifier => {
-      if (specifier.startsWith("node:") || builtins.has(specifier)) return false;
+      if (specifier.startsWith("node:") || builtins.has(specifier))
+        return false;
       if (specifier.startsWith(".") || specifier.startsWith("/")) return false;
       return !runtime.has(packageName(specifier));
     });
@@ -46,7 +51,10 @@ describe("production bundle does not require devDependencies", () => {
   });
 
   it("loads vite only through dynamic import inside setupVite", () => {
-    const source = fs.readFileSync(path.join(root, "server/_core/vite.ts"), "utf-8");
+    const source = fs.readFileSync(
+      path.join(root, "server/_core/vite.ts"),
+      "utf-8"
+    );
     expect(source).toMatch(/await import\(["']vite["']\)/);
   });
 });
@@ -56,12 +64,35 @@ describe("request body limit", () => {
   const base = `http://127.0.0.1:${port}`;
   let child: ChildProcess;
 
+  it("rate-limits tRPC requests but keeps health available", async () => {
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const response = await fetch(`${base}/api/trpc/auth.me`);
+      expect(response.status).not.toBe(429);
+    }
+
+    const limited = await fetch(`${base}/api/trpc/auth.me`);
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toMatch(/^\d+$/);
+
+    const health = await fetch(`${base}/api/health`);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ status: "ok" });
+  });
+
   beforeAll(async () => {
-    child = spawn(path.join(root, "node_modules/.bin/tsx"), ["server/_core/index.ts"], {
-      cwd: root,
-      env: { ...process.env, NODE_ENV: "production", PORT: String(port) },
-      stdio: "ignore",
-    });
+    child = spawn(
+      process.execPath,
+      [
+        path.join(root, "node_modules/tsx/dist/cli.mjs"),
+        "server/_core/index.ts",
+      ],
+      {
+        cwd: root,
+        env: { ...process.env, NODE_ENV: "production", PORT: String(port) },
+        stdio: "ignore",
+      }
+    );
     for (let attempt = 0; attempt < 60; attempt++) {
       try {
         const res = await fetch(`${base}/api/health`);
