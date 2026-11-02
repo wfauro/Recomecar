@@ -75,7 +75,7 @@ describe("closeEncounter", () => {
   it("leaves nothing recorded as concluded or in progress", () => {
     const closed = closeEncounter(finished);
     expect(closed.completedStep).toBe(0);
-    expect(closed.journeyStep).toBe(2);
+    expect(closed.journeyStep).toBe(1);
     expect(hasEncounterInProgress(closed, 3)).toBe(false);
   });
 

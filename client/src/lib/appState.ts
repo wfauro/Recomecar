@@ -53,7 +53,7 @@ export function hasEncounterInProgress(state: AppState, totalSteps: number): boo
 
 /** Closes the encounter: nothing is kept as "concluded". Theme, level and protocol stay. */
 export function closeEncounter(state: AppState): AppState {
-  return { ...state, completedStep: 0, journeyStep: Math.min(state.journeyStep, 2) };
+  return { ...state, completedStep: 0, journeyStep: 1 };
 }
 
 /** Starts a new encounter with the same preferences. */
