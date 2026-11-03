@@ -360,17 +360,23 @@ export default function Home() {
     setNotice(nextCount >= steps.length ? "Encontro concluído. Você voltou hoje." : "Etapa concluída. O próximo passo já está aberto.");
   };
 
-  const startNextEncounter = () => {
-    setState(current => startNewEncounter(current));
-    setNotice("Novo encontro pronto.");
-    go("encontro");
-  };
+const startNextEncounter = () => {
+  setDistance(undefined);
+  setDifficulty(undefined);
 
-  const closeEncounter = () => {
-    setState(current => closeEncounterState(current));
-    setNotice("Encontro fechado.");
-    go("home");
-  };
+  setState(current => startNewEncounter(current));
+  setNotice("Novo encontro pronto.");
+  go("encontro");
+};
+
+const closeEncounter = () => {
+  setDistance(undefined);
+  setDifficulty(undefined);
+
+  setState(current => closeEncounterState(current));
+  setNotice("Encontro fechado.");
+  go("home");
+};
 
   const handleNextAction = () => (completed ? closeEncounter() : go(nextAction.view));
 
@@ -540,12 +546,308 @@ export default function Home() {
     if (state.journeyStep === 0) {
       return <div className="view-stack"><section className="page-intro compact-intro"><div className="eyebrow">Passo 02 · Seu próximo encontro</div><h1>Antes do roteiro, escolha o seu ponto de partida.</h1><p className="lead">A sequência foi pensada para você não precisar decidir tudo de uma vez.</p></section><section className="flow-gate surface-card"><div className="gate-icon"><Compass size={23} /></div><div><span className="eyebrow">A ordem importa</span><h2>Comece pelo diagnóstico curto.</h2><p>Ele ajuda o encontro a respeitar o seu momento e evita que você escolha um plano grande demais para hoje.</p><button className="button button-green" type="button" onClick={() => go("diagnostico")}>Ir para ponto de partida <ArrowRight size={16} /></button></div></section></div>;
     }
-    return <div className="view-stack">
-      <section className="page-intro compact-intro"><button className="back-button" type="button" onClick={() => go("diagnostico")}><ArrowLeft size={15} /> Ponto de partida</button><div className="eyebrow">Passo 02 · Seu encontro</div><h1>Escolha o seu ritmo.</h1><p className="lead">Você não precisa provar que consegue fazer mais. Só precisa escolher uma entrada possível.</p></section>
-      <div className="flow-progress"><span className={state.completedStep > 0 ? "done" : "active"}>01 Ler</span><span className={state.completedStep > 1 ? "done" : state.completedStep === 1 ? "active" : "muted"}>02 Meditar</span><span className={state.completedStep >= 3 ? "done active" : state.completedStep === 2 ? "active" : "muted"}>03 Orar</span></div>
-      <section className="level-section"><div className="section-title-row"><div><span className="eyebrow">Escolha de agora</span><h2>Quanto cabe no seu momento?</h2></div><span className="section-caption">{state.journeyStep >= 2 ? "roteiro liberado" : "selecione um ritmo"}</span></div><div className="level-grid-app"><button type="button" className={`level-app-card ${state.level === "2" ? "selected" : ""}`} onClick={() => chooseLevel("2")}><span className="level-app-icon"><Zap size={19} /></span><span className="level-app-time">02 min</span><strong>Tenho 2 minutos</strong><small>Uma oração de chegada. O menor passo possível.</small></button><button type="button" className={`level-app-card ${state.level === "10" ? "selected" : ""}`} onClick={() => chooseLevel("10")}><span className="level-app-icon"><Clock3 size={19} /></span><span className="level-app-time">10 min</span><strong>Tenho 10 minutos</strong><small>Passagem, reflexão e oração em um encontro guiado.</small></button><button type="button" className={`level-app-card ${state.level === "calma" ? "selected" : ""}`} onClick={() => chooseLevel("calma")}><span className="level-app-icon"><Leaf size={19} /></span><span className="level-app-time">RITMO CALMO</span><strong>Quero continuar com mais calma</strong><small>Reflexão ampliada e acesso ao próximo encontro.</small></button></div></section>
-      {state.journeyStep >= 2 ? <section className="route-panel surface-card"><div className="route-header-app"><div><span className="eyebrow">Passo 03 · Encontro guiado</span><h2>{completed ? "Você concluiu o encontro." : "Um encontro no seu ritmo."}</h2><p>{completed ? "A próxima decisão pode ser pequena também." : `${protocolDetails[state.protocol].title} · ${state.level === "2" ? "2 minutos" : state.level === "calma" ? "ritmo calmo" : "10 minutos"}`}</p></div><div className="percent-badge"><strong>{completionPercent}%</strong><small>{state.completedStep} de {steps.length}</small></div></div><div className="route-progress"><span style={{ width: `${completionPercent}%` }} /></div><div className="step-tabs">{steps.map((step, index) => <div key={`${step.title}-${index}`} className={`step-tab ${index < state.completedStep ? "done" : index === currentIndex && !completed ? "active" : ""}`}><span>{index < state.completedStep ? <Check size={12} /> : index + 1}</span><small>{step.eyebrow}</small></div>)}</div>{completed ? <div className="completion-panel"><div className="completion-check"><Check size={23} /></div><div><span className="eyebrow">Encontro concluído</span><h2>Você voltou hoje.</h2><p>Você escolheu estar presente neste momento.</p><div className="identity-quote">“Eu posso seguir em frente, um passo de cada vez.”<small>Inspirado em Filipenses 3:13–14</small></div><div className="action-row"><button className="button button-green" type="button" onClick={closeEncounter}>Fechar encontro <ArrowRight size={16} /></button></div><p className="step-prompt-app">Se desejar permanecer mais um pouco, você pode iniciar outro encontro. O encontro de hoje já foi concluído.</p><button className="text-button-app" type="button" onClick={startNextEncounter}>Iniciar outro encontro</button></div></div> : <div className="active-step-card"><div className="active-step-icon"><BookOpen size={22} /></div><div className="active-step-main"><div className="step-meta"><span>{steps[currentIndex].time}</span><span>Agora</span></div><h2>{steps[currentIndex].title}</h2><p className="step-prompt-app">{steps[currentIndex].prompt}</p>{currentIndex === 0 ? renderBibleCard() : null}<div className="passage-block"><span>Para este momento</span><p>{steps[currentIndex].passage}</p></div><div className="step-details"><div><span>Faça assim</span><p>{steps[currentIndex].focus}</p></div><div><span>Por que ajuda</span><p>{steps[currentIndex].why}</p></div></div><button className="button button-green" type="button" onClick={completeCurrentStep}>{steps[currentIndex].action} <Check size={16} /></button></div></div>}<div className="route-footnote"><LockKeyhole size={14} /> Salvo neste navegador. Se sair agora, você volta exatamente daqui.</div></section> : null}
-    </div>;
+   return (
+  <div className="view-stack">
+    <section className="page-intro compact-intro">
+      <button
+        className="back-button"
+        type="button"
+        onClick={() => go("diagnostico")}
+      >
+        <ArrowLeft size={15} /> Ponto de partida
+      </button>
+
+      <div className="eyebrow">Passo 02 · Seu encontro</div>
+
+      <h1>Escolha o seu ritmo.</h1>
+
+      <p className="lead">
+        Você não precisa provar que consegue fazer mais. Só precisa escolher
+        uma entrada possível.
+      </p>
+    </section>
+
+    <div className="flow-progress">
+      <span
+  className={
+    state.completedStep > 0
+      ? "done"
+      : state.journeyStep > 0
+        ? "active"
+        : "muted"
+  }
+>
+  01 Ler
+</span>
+
+      <span
+        className={
+          state.completedStep > 1
+            ? "done"
+            : state.completedStep === 1
+              ? "active"
+              : "muted"
+        }
+      >
+        02 Meditar
+      </span>
+
+      <span
+        className={
+          state.completedStep >= 3
+            ? "done active"
+            : state.completedStep === 2
+              ? "active"
+              : "muted"
+        }
+      >
+        03 Orar
+      </span>
+    </div>
+
+    <section className="level-section">
+      <div className="section-title-row">
+        <div>
+          <span className="eyebrow">Escolha de agora</span>
+          <h2>Quanto cabe no seu momento?</h2>
+        </div>
+
+        <span className="section-caption">
+          {state.journeyStep >= 2 ? "roteiro liberado" : "selecione um ritmo"}
+        </span>
+      </div>
+
+      <div className="level-grid-app">
+        <button
+          type="button"
+          className={`level-app-card ${
+            state.journeyStep > 0 && state.level === "2" ? "selected" : ""
+          }`}
+          onClick={() => chooseLevel("2")}
+        >
+          <span className="level-app-icon">
+            <Zap size={19} />
+          </span>
+
+          <span className="level-app-time">02 min</span>
+
+          <strong>Tenho 2 minutos</strong>
+
+          <small>
+            Uma oração de chegada. O menor passo possível.
+          </small>
+        </button>
+
+        <button
+          type="button"
+          className={`level-app-card ${
+            state.journeyStep > 0 && state.level === "10" ? "selected" : ""
+          }`}
+          onClick={() => chooseLevel("10")}
+        >
+          <span className="level-app-icon">
+            <Clock3 size={19} />
+          </span>
+
+          <span className="level-app-time">10 min</span>
+
+          <strong>Tenho 10 minutos</strong>
+
+          <small>
+            Passagem, reflexão e oração em um encontro guiado.
+          </small>
+        </button>
+
+        <button
+          type="button"
+          className={`level-app-card ${
+            state.journeyStep > 0 && state.level === "calma"
+              ? "selected"
+              : ""
+          }`}
+          onClick={() => chooseLevel("calma")}
+        >
+          <span className="level-app-icon">
+            <Leaf size={19} />
+          </span>
+
+          <span className="level-app-time">RITMO CALMO</span>
+
+          <strong>Quero continuar com mais calma</strong>
+
+          <small>
+            Reflexão ampliada e acesso ao próximo encontro.
+          </small>
+        </button>
+      </div>
+    </section>
+
+    {state.journeyStep >= 2 ? (
+      <section className="route-panel surface-card">
+        <div className="route-header-app">
+          <div>
+            <span className="eyebrow">
+              Passo 03 · Encontro guiado
+            </span>
+
+            <h2>
+              {completed
+                ? "Você concluiu o encontro."
+                : "Um encontro no seu ritmo."}
+            </h2>
+
+            <p>
+              {completed
+                ? "A próxima decisão pode ser pequena também."
+                : `${protocolDetails[state.protocol].title} · ${
+                    state.level === "2"
+                      ? "2 minutos"
+                      : state.level === "calma"
+                        ? "ritmo calmo"
+                        : "10 minutos"
+                  }`}
+            </p>
+          </div>
+
+          <div className="percent-badge">
+            <strong>{completionPercent}%</strong>
+            <small>
+              {state.completedStep} de {steps.length}
+            </small>
+          </div>
+        </div>
+
+        <div className="route-progress">
+          <span style={{ width: `${completionPercent}%` }} />
+        </div>
+
+        <div className="step-tabs">
+          {steps.map((step, index) => (
+            <div
+              key={`${step.title}-${index}`}
+              className={`step-tab ${
+                index < state.completedStep
+                  ? "done"
+                  : index === currentIndex && !completed
+                    ? "active"
+                    : ""
+              }`}
+            >
+              <span>
+                {index < state.completedStep ? (
+                  <Check size={12} />
+                ) : (
+                  index + 1
+                )}
+              </span>
+
+              <small>{step.eyebrow}</small>
+            </div>
+          ))}
+        </div>
+
+        {completed ? (
+          <div className="completion-panel">
+            <div className="completion-check">
+              <Check size={23} />
+            </div>
+
+            <div>
+              <span className="eyebrow">Encontro concluído</span>
+
+              <h2>Você voltou hoje.</h2>
+
+              <p>
+                Você escolheu estar presente neste momento.
+              </p>
+
+              <div className="identity-quote">
+                “Eu posso seguir em frente, um passo de cada vez.”
+                <small>
+                  Inspirado em Filipenses 3:13–14
+                </small>
+              </div>
+
+              <div className="action-row">
+                <button
+                  className="button button-green"
+                  type="button"
+                  onClick={closeEncounter}
+                >
+                  Fechar encontro <ArrowRight size={16} />
+                </button>
+              </div>
+
+              <p className="step-prompt-app">
+                Se desejar permanecer mais um pouco, você pode iniciar outro
+                encontro. O encontro de hoje já foi concluído.
+              </p>
+
+              <button
+                className="text-button-app"
+                type="button"
+                onClick={startNextEncounter}
+              >
+                Iniciar outro encontro
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="active-step-card">
+            <div className="active-step-icon">
+              <BookOpen size={22} />
+            </div>
+
+            <div className="active-step-main">
+              <div className="step-meta">
+                <span>{steps[currentIndex].time}</span>
+                <span>Agora</span>
+              </div>
+
+              <h2>{steps[currentIndex].title}</h2>
+
+              <p className="step-prompt-app">
+                {steps[currentIndex].prompt}
+              </p>
+
+              {currentIndex === 0 ? renderBibleCard() : null}
+
+              <div className="passage-block">
+                <span>Para este momento</span>
+                <p>{steps[currentIndex].passage}</p>
+              </div>
+
+              <div className="step-details">
+                <div>
+                  <span>Faça assim</span>
+                  <p>{steps[currentIndex].focus}</p>
+                </div>
+
+                <div>
+                  <span>Por que ajuda</span>
+                  <p>{steps[currentIndex].why}</p>
+                </div>
+              </div>
+
+              <button
+                className="button button-green"
+                type="button"
+                onClick={completeCurrentStep}
+              >
+                {steps[currentIndex].action} <Check size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="route-footnote">
+          <LockKeyhole size={14} />
+          Salvo neste navegador. Se sair agora, você volta exatamente daqui.
+        </div>
+      </section>
+    ) : null}
+  </div>
+);
   };
 
   const renderSupport = () => (

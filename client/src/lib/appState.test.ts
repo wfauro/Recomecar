@@ -31,7 +31,7 @@ describe("normalizeState", () => {
   it("never restores a finished encounter as finished", () => {
     const state = normalizeState({ completedStep: 3, journeyStep: 3, theme: "light", level: "calma", protocol: "proximo" }, threeSteps);
     expect(state.completedStep).toBe(0);
-    expect(state.journeyStep).toBe(2);
+    expect(state.journeyStep).toBe(0);
     expect(state.theme).toBe("light");
     expect(state.level).toBe("calma");
     expect(state.protocol).toBe("proximo");
@@ -75,7 +75,7 @@ describe("closeEncounter", () => {
   it("leaves nothing recorded as concluded or in progress", () => {
     const closed = closeEncounter(finished);
     expect(closed.completedStep).toBe(0);
-    expect(closed.journeyStep).toBe(1);
+    expect(closed.journeyStep).toBe(0);
     expect(hasEncounterInProgress(closed, 3)).toBe(false);
   });
 
@@ -88,7 +88,20 @@ describe("closeEncounter", () => {
 
 describe("startNewEncounter", () => {
   it("restarts the steps and keeps preferences", () => {
-    const next = startNewEncounter({ level: "2", protocol: "alivio", completedStep: 2, journeyStep: 2, theme: "light" });
-    expect(next).toEqual({ level: "2", protocol: "alivio", completedStep: 0, journeyStep: 2, theme: "light" });
+    const next = startNewEncounter({
+      level: "2",
+      protocol: "alivio",
+      completedStep: 2,
+      journeyStep: 2,
+      theme: "light",
+    });
+
+    expect(next).toEqual({
+      level: "2",
+      protocol: "alivio",
+      completedStep: 0,
+      journeyStep: 0,
+      theme: "light",
+    });
   });
 });
