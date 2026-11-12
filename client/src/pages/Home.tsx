@@ -35,6 +35,7 @@ import {
   type Protocol,
   type Theme,
 } from "@/lib/appState";
+import { getPassage, type Passage } from "@/content/passages";
 
 type Distance = "dias" | "fe";
 type Difficulty = "sobrecarregado" | "direcao" | "vergonha" | "desistencia";
@@ -51,14 +52,7 @@ type RouteStep = {
   action: string;
 };
 
-type BibleTarget = {
-  book: "PSA" | "MAT";
-  chapter: number;
-  start: number;
-  end: number;
-  reference: string;
-  fallback: string;
-};
+type BibleTarget = Passage;
 
 type BibleState = {
   status: "idle" | "loading" | "ready" | "fallback";
@@ -182,14 +176,7 @@ function getRecommendedProtocol(distance?: Distance, difficulty?: Difficulty): P
 }
 
 function getBibleTarget(level: Level, protocol: Protocol): BibleTarget {
-  if (protocol === "alivio" || protocol === "constrangimento") {
-    return level === "2"
-      ? { book: "MAT", chapter: 11, start: 28, end: 28, reference: "Mateus 11:28", fallback: "Vinde a mim, todos vocês que trabalham e estão sobrecarregados, e eu lhes darei descanso." }
-      : { book: "MAT", chapter: 11, start: 28, end: level === "calma" ? 30 : 29, reference: level === "calma" ? "Mateus 11:28-30" : "Mateus 11:28-29", fallback: level === "calma" ? "Vinde a mim, todos vocês que trabalham e estão sobrecarregados, e eu lhes darei descanso. Tomai sobre vós o meu jugo e aprendei de mim, pois sou manso e humilde de coração; e encontrareis descanso para vossas almas. Pois o meu jugo é fácil, e meu fardo é leve." : "Vinde a mim, todos vocês que trabalham e estão sobrecarregados, e eu lhes darei descanso. Tomai sobre vós o meu jugo e aprendei de mim, pois sou manso e humilde de coração; e encontrareis descanso para vossas almas." };
-  }
-  return level === "calma"
-    ? { book: "PSA", chapter: 23, start: 1, end: 6, reference: "Salmos 23:1-6", fallback: "Yahweh é meu pastor; nada me faltará. Ele me faz deitar em pastos verdes. Ele me conduz ao lado de águas paradas. Ele restaura minha alma. Ele me guia nos caminhos da retidão por causa de seu nome. Embora eu caminhe pelo vale da sombra da morte, eu não temerei nenhum mal, pois vocês estão comigo. Certamente a bondade e a bondade amorosa me acompanharão todos os dias da minha vida, e eu morarei na casa de Yahweh para sempre." }
-    : { book: "PSA", chapter: 23, start: 1, end: 3, reference: "Salmos 23:1-3", fallback: "Yahweh é meu pastor; nada me faltará. Ele me faz deitar em pastos verdes. Ele me conduz ao lado de águas paradas. Ele restaura minha alma. Ele me guia nos caminhos da retidão por causa de seu nome." };
+  return getPassage(level, protocol);
 }
 
 function extractBibleText(payload: { chapter?: { content?: { type?: string; number?: number; content?: (string | { text?: string })[] }[] } }, target: BibleTarget) {
@@ -199,7 +186,12 @@ function extractBibleText(payload: { chapter?: { content?: { type?: string; numb
   return text;
 }
 
-function getSteps(level: Level, protocol: Protocol): RouteStep[] {
+function getSteps(
+  level: Level,
+  protocol: Protocol,
+  passage?: BibleTarget,
+): RouteStep[] {
+  const passageReference = passage?.reference ?? "a passagem sugerida";
   if (level === "2") {
     return [
       {
@@ -239,9 +231,9 @@ function getSteps(level: Level, protocol: Protocol): RouteStep[] {
       {
         time: "5 min",
         eyebrow: "Passagem",
-        title: "Leia Salmo 23:1-3",
+        title: `Leia ${passageReference}`,
         prompt: "Leia devagar, no seu próprio ritmo.",
-        passage: "Observe a imagem de cuidado, direção e descanso que aparece no texto.",
+        passage: "Leia a passagem com calma e perceba o que chama sua atenção.",
         focus: "Escolha uma palavra ou imagem para levar com você.",
         why: "A leitura volta a ser um encontro, não uma prova de desempenho.",
         action: "Concluir passagem",
@@ -268,8 +260,22 @@ function getSteps(level: Level, protocol: Protocol): RouteStep[] {
       },
     ];
   }
-  const firstTitle = protocol === "mapa" ? "Abra pelo seu momento" : protocol === "constrangimento" ? "Volte sem explicar sua ausência" : protocol === "proximo" ? "Continue pelo próximo trecho" : "Leia Salmo 23:1-3";
-  const firstPrompt = protocol === "mapa" ? "Leia Salmo 23:1-3 a partir do seu momento de hoje." : protocol === "constrangimento" ? "Leia lembrando que você não precisa provar nada para voltar." : protocol === "proximo" ? "Leia como o próximo passo, no seu próprio ritmo." : "Leia a passagem indicada no seu próprio ritmo.";
+  const firstTitle =
+  protocol === "mapa"
+    ? "Abra pelo seu momento"
+    : protocol === "constrangimento"
+      ? "Volte sem explicar sua ausência"
+      : protocol === "proximo"
+        ? "Continue pelo próximo trecho"
+        : `Leia ${passageReference}`;
+  const firstPrompt =
+  protocol === "mapa"
+    ? `Leia ${passageReference} a partir do seu momento de hoje.`
+    : protocol === "constrangimento"
+      ? `Leia ${passageReference} lembrando que você não precisa provar nada para voltar.`
+      : protocol === "proximo"
+        ? `Leia ${passageReference} como o próximo passo, no seu próprio ritmo.`
+        : `Leia ${passageReference} no seu próprio ritmo.`;
   const firstPassage = protocol === "mapa" ? "Observe uma palavra ou imagem que encontre o seu momento de hoje." : protocol === "constrangimento" ? "Você pode chegar como está. Não precisa transformar a ausência em explicação." : protocol === "proximo" ? "Observe uma palavra que possa acompanhar o seu próximo encontro." : "Observe uma palavra ou imagem que encontre o seu momento de hoje.";
   return [
     { time: "3 min", eyebrow: protocolDetails[protocol].title, title: firstTitle, prompt: firstPrompt, passage: firstPassage, focus: "Leia para encontrar um ponto de contato.", why: "A primeira passagem devolve um lugar claro para começar.", action: "Concluir passagem" },
@@ -283,12 +289,48 @@ export default function Home() {
   const [view, setView] = useState<View>("home");
   const [distance, setDistance] = useState<Distance>();
   const [difficulty, setDifficulty] = useState<Difficulty>();
+type DiagnosticSnapshot = {
+  distance: Distance;
+  difficulty: Difficulty;
+};
+
+const [previousDiagnostic, setPreviousDiagnostic] =
+  useState<DiagnosticSnapshot | null>(() => {
+    try {
+      const stored = window.localStorage.getItem(
+        "recomecar-last-diagnostic",
+      );
+
+      if (!stored) return null;
+
+      const parsed = JSON.parse(stored) as DiagnosticSnapshot;
+
+      const validDistance = distanceOptions.some(
+        option => option.value === parsed.distance,
+      );
+
+      const validDifficulty = difficultyOptions.some(
+        option => option.value === parsed.difficulty,
+      );
+
+      return validDistance && validDifficulty ? parsed : null;
+    } catch {
+      return null;
+    }
+  });  
   const [openTrouble, setOpenTrouble] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [resumePending, setResumePending] = useState(() => hasEncounterInProgress(state, getSteps(state.level, state.protocol).length));
 
-  const steps = useMemo(() => getSteps(state.level, state.protocol), [state.level, state.protocol]);
-  const bibleTarget = useMemo(() => getBibleTarget(state.level, state.protocol), [state.level, state.protocol]);
+  const bibleTarget = useMemo(
+  () => getBibleTarget(state.level, state.protocol),
+  [state.level, state.protocol],
+);
+
+const steps = useMemo(
+  () => getSteps(state.level, state.protocol, bibleTarget),
+  [state.level, state.protocol, bibleTarget],
+);
   const [bibleState, setBibleState] = useState<BibleState>({ status: "idle", text: "" });
   const completed = state.completedStep >= steps.length;
   const currentIndex = Math.min(state.completedStep, Math.max(steps.length - 1, 0));
@@ -313,7 +355,12 @@ export default function Home() {
       .then(payload => setBibleState({ status: "ready", text: extractBibleText(payload, bibleTarget) }))
       .catch(error => {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setBibleState({ status: "fallback", text: bibleTarget.fallback });
+        setBibleState({
+  status: "fallback",
+  text:
+    bibleTarget.fallback ??
+    "Não foi possível carregar o texto desta passagem agora.",
+});
       });
     return () => controller.abort();
   }, [bibleTarget]);
@@ -341,12 +388,61 @@ export default function Home() {
     setView(nextView);
   };
 
-  const continueFromDiagnostic = () => {
-    if (!recommended) return;
-    setState(current => ({ ...current, protocol: recommended, journeyStep: Math.max(current.journeyStep, 1) }));
-    setNotice(`${protocolDetails[recommended].title} escolhido como ponto de partida.`);
-    go("encontro");
+const continueFromDiagnostic = () => {
+  if (!recommended || !distance || !difficulty) return;
+
+  const snapshot: DiagnosticSnapshot = {
+    distance,
+    difficulty,
   };
+
+  setPreviousDiagnostic(snapshot);
+
+  try {
+    window.localStorage.setItem(
+      "recomecar-last-diagnostic",
+      JSON.stringify(snapshot),
+    );
+  } catch {
+    // A escolha continua funcionando mesmo se o navegador bloquear storage.
+  }
+
+  setState(current => ({
+    ...current,
+    protocol: recommended,
+    journeyStep: Math.max(current.journeyStep, 1),
+  }));
+
+  setNotice(
+    `${protocolDetails[recommended].title} escolhido como ponto de partida.`,
+  );
+
+  go("encontro");
+};
+
+const skipDiagnostic = () => {
+  if (!previousDiagnostic) return;
+
+  const previousProtocol = getRecommendedProtocol(
+    previousDiagnostic.distance,
+    previousDiagnostic.difficulty,
+  );
+
+  if (!previousProtocol) return;
+
+  setDistance(previousDiagnostic.distance);
+  setDifficulty(previousDiagnostic.difficulty);
+
+  setState(current => ({
+    ...current,
+    protocol: previousProtocol,
+    completedStep: 0,
+    journeyStep: 1,
+  }));
+
+  setNotice("Vamos continuar com o seu ponto de partida anterior.");
+  go("encontro");
+};
 
   const chooseLevel = (level: Level) => {
     const protocol = level === "2" ? "alivio" : state.protocol === "alivio" ? "mapa" : state.protocol;
@@ -543,9 +639,59 @@ const closeEncounter = () => {
   );
 
   const renderEncounter = () => {
-    if (state.journeyStep === 0) {
-      return <div className="view-stack"><section className="page-intro compact-intro"><div className="eyebrow">Passo 02 · Seu próximo encontro</div><h1>Antes do roteiro, escolha o seu ponto de partida.</h1><p className="lead">A sequência foi pensada para você não precisar decidir tudo de uma vez.</p></section><section className="flow-gate surface-card"><div className="gate-icon"><Compass size={23} /></div><div><span className="eyebrow">A ordem importa</span><h2>Comece pelo diagnóstico curto.</h2><p>Ele ajuda o encontro a respeitar o seu momento e evita que você escolha um plano grande demais para hoje.</p><button className="button button-green" type="button" onClick={() => go("diagnostico")}>Ir para ponto de partida <ArrowRight size={16} /></button></div></section></div>;
-    }
+if (state.journeyStep === 0) {
+  return (
+    <div className="view-stack">
+      <section className="page-intro compact-intro">
+        <div className="eyebrow">Passo 02 · Seu próximo encontro</div>
+
+        <h1>Antes do roteiro, escolha o seu ponto de partida.</h1>
+
+        <p className="lead">
+          A sequência foi pensada para você não precisar decidir tudo de uma vez.
+        </p>
+      </section>
+
+      <section className="flow-gate surface-card">
+        <div className="gate-icon">
+          <Compass size={23} />
+        </div>
+
+        <div>
+          <span className="eyebrow">A ordem importa</span>
+
+          <h2>Comece pelo diagnóstico curto.</h2>
+
+          <p>
+            Ele ajuda o encontro a respeitar o seu momento e evita que você
+            escolha um plano grande demais para hoje.
+          </p>
+
+          <div className="action-row">
+            <button
+              className="button button-green"
+              type="button"
+              onClick={() => go("diagnostico")}
+            >
+              Fazer o diagnóstico
+              <ArrowRight size={16} />
+            </button>
+
+            {previousDiagnostic ? (
+              <button
+                className="text-button-app"
+                type="button"
+                onClick={skipDiagnostic}
+              >
+                Continuar com o ponto anterior
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
    return (
   <div className="view-stack">
     <section className="page-intro compact-intro">
